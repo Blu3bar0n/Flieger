@@ -25,7 +25,7 @@ class SENS():
     accogWorld = [0.0,0.0,0.0]
     vVehicle = [0.0, 0.0, 0.0]
     vWorld = [0.0, 0.0, 0.0]
-    pos = [0.0, 0.0, 0.0]                    #pos[lat,lon, meter ber ground)
+    pos = [0.0, 0.0, 0.0]                    #pos[lat,lon, meter ueber ground)
     gyr_raw =[0.0,0.0,0.0, 0.0, 0]
     gyrWorld = [0.0, 0.0,0.0]
     mag_raw = [0.0,0.0,0.0, 0.0, 0]
@@ -54,7 +54,7 @@ class SENS():
 
     def Positionsbestimmung(self):
         gV = [0, 0, 9.81]
-        winkel = [self.istgyr[0] / 180 * math.pi, self.istgyr[1] / 180 * math.pi, self.istgyr[1] / 180 * math.pi]
+        winkel = [self.istgyr[0] / 180 * math.pi, self.istgyr[1] / 180 * math.pi, self.istgyr[2] / 180 * math.pi]
         gV = KONST.RMatrixWeltZuFahrzeug(gV, winkel)
         #print("winkel",winkel)
         #print("gV", gV)
@@ -82,10 +82,12 @@ class SENS():
     
     def ComplementaryFilter(self):
         tmon = round(time.monotonic(), 2) #alle 0,01 s
-        if(tmon-self.tmonCFold > 1): #alle 0,02s
+        #print(tmon, self.tmonCFold)
+        if(tmon-self.tmonCFold > 0.011): #alle 0,02s
             self.tmonCFold = tmon
             #print(tmon)
             accBetrag = math.sqrt(self.acc_raw[0]*self.acc_raw[0] + self.acc_raw[1]*self.acc_raw[1] + self.acc_raw[2]*self.acc_raw[2])
+            #print(accBetrag)
             if (5.0 < accBetrag and accBetrag < 15.0):
                 ragyr = math.atan2(self.acc_raw[1], self.acc_raw[2]) * 180 / math.pi #roll from Acc
                 self.istgyr[0] = self.istgyr[0] * 0.98 + ragyr * 0.02   
@@ -94,16 +96,22 @@ class SENS():
                 self.istgyr[1] = self.istgyr[1] * 0.98 + pagyr * 0.02 
                 #print (pagyr , self.istgyr[1])
         
-        if(tmon-self.tmonCFoldMag > 14): #alle 0,15s
-            self.tmonCFold = tmon
+        if(tmon-self.tmonCFoldMag > 0.141): #alle 0,15s
+            self.tmonCFoldMag = tmon
             yagyr = math.atan2(self.mag_raw[1], self.mag_raw[0]) * 180 / math.pi #pitch from Acc
-            #print("yaw mag", yagyr)
-            self.istgyr[1] = self.istgyr[2] * 0.98 + yagyr * 0.05
+            print("yaw mag", yagyr)
+            if(abs(self.istgyr[2] - yagyr)<180):
+                self.istgyr[2] = self.istgyr[2] * 0.95 + yagyr * 0.05
+            else:
+                self.istgyr[2] = self.ShiftInRange(self.istgyr[2],0,360)
+                yagyr = self.ShiftInRange(yagyr,0,360)
+                self.istgyr[2] = self.istgyr[2] * 0.95 + yagyr * 0.05
+                self.istgyr[2] = self.ShiftInRange(self.istgyr[2],-180,180)
             
     def ComplementaryFilterAcc(self):
         tmon = round(time.monotonic(), 2) #alle 0,01 s
-        if(tmon-self.tmonCFoldAcc > 1): #alle 0,02s
-            self.tmonCFold = tmon
+        if(tmon-self.tmonCFoldAcc > 0.011): #alle 0,02s
+            self.tmonCFoldAcc = tmon
             tmpx = self.lastValidLat + self.dposLastValidOhneFilter[0]
             tmpy = self.lastValidLon + self.dposLastValidOhneFilter[1]
             self.pos[0] = self.pos[0] * 0.98 + tmpx * 0.02
@@ -127,7 +135,7 @@ class SENS():
 
     
     def CalcEuler(self):
-        winkel = [self.istgyr[0] / 180 * math.pi, self.istgyr[1] / 180 * math.pi, self.istgyr[1] / 180 * math.pi]
+        winkel = [self.istgyr[0] / 180 * math.pi, self.istgyr[1] / 180 * math.pi, self.istgyr[2] / 180 * math.pi]
         self.gyrWorld = KONST.WGeschwindigkeitRMatrixFahrzeugZUWelt(self.gyr_raw, winkel)
         self.istgyr[0] = self.istgyr[0] + self.gyr_raw[3] * self.gyrWorld[0] 
         self.istgyr[0] = self.ShiftInRange(self.istgyr[0],-180,180)
@@ -163,6 +171,10 @@ def Process(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps):
                     else:
                         Sens.pos[0] = Sens.pos[0]/2 + Sens.lastValidLat/2
                         Sens.pos[1] = Sens.pos[1]/2 + Sens.lastValidLon/2
+        bmi160Data =  qparent_bmi.recv()
+        yagyr = math.atan2(bmi160Data[2][1], bmi160Data[2][0]) * 180 / math.pi #pitch from Acc
+        print("yaw mag", yagyr)
+        Sens.istgyr[2] = yagyr
         while(True):
             try:
                 #///////////////////////////////Get Data///////////////////
@@ -209,7 +221,7 @@ def Process(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps):
                         Sens.dataToSend[7][i]  = Sens.pos[i]
                     Sens.dataToSend[8][0]  = Sens.gps.lat
                     Sens.dataToSend[8][1]  = Sens.gps.lon
-                        
+                    #print("istgyr:",  Sens.istgyr)  
                     qchild_sens.send(Sens.dataToSend)
             except KeyboardInterrupt: 
                 exit()

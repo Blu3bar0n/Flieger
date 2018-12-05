@@ -1,2 +1,0 @@
-Unexpectet Error in Sensorfusion:
-'REGELUNG' object has no attribute 'gyr_raw'

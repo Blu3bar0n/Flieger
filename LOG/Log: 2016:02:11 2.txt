@@ -1,2 +1,0 @@
-Unexpectet Error in Sensorfusion:
-list index out of range

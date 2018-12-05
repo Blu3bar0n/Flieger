@@ -11,6 +11,7 @@ import h5py
 from pathlib import Path
 import Sensorfusion
 import Regelung
+import Trajektorie
 
 eth = open("/sys/class/net/eth0/operstate","r")
 streth = eth.read(2)
@@ -35,6 +36,7 @@ channel = KONST.CHDEF
 chSend = KONST.CHSENDDEF
 gps = GPSDevice.GPSDevice()
 sens = Sensorfusion.SENS()
+trajek = Trajektorie.TRAJEKTORIE()
 print("obj generiert")
 
 maxAbsGyr = [0.0,0.0,0.0]
@@ -61,7 +63,6 @@ maxH5countH5cuw = 64000 #mit 50hz reicht das 21min
 maxH5ycuw = 36
 dsetH5cuw = h5group_ChannelUndWinkel.create_dataset("ch1-5, istgyr1-3", (maxH5countH5cuw,maxH5ycuw), chunks=True)#, dtype='float64') #mit 100hz reicht das 1h
 countH5cuw = 0
-countH5cuw50Hz = 0
 tmonCFoldH5 = round(time.monotonic(), 2)
 if(tmonCFoldH5 > 2000000.0):
     print("Monotonic overflow! Warnung")
@@ -165,7 +166,7 @@ if __name__ == '__main__':
     print("MAG Kallib")
     tasterReleased = 0
     gpsUp = 0
-    while(taster[0] != KONST.TL or tasterReleased == 0 or kallibstate != 0 or gpsUp == 0):
+    while(taster[0] != KONST.TL or tasterReleased == 0 or kallibstate != 0 ):#or gpsUp == 0):
         if (qparent_led.poll() == True):
             taster =  qparent_led.recv()
         if (taster[0] == KONST.KT):
@@ -312,6 +313,13 @@ if __name__ == '__main__':
                     if (switchOld != 1):
                         logstr = logstr + "Flugsteuerung: change pid"+'\n'
                         switchOld = 1
+                        trajek.SetOldWaypoint(sens.pos)
+                        n_Wp = [0.0, 0.0, 0.0, 0.0, 0.0]
+                        n_Wp[0] = sens.pos[0]
+                        n_Wp[1] = sens.pos[1]
+                        n_Wp[2] = sens.pos[2]
+                        n_Wp[4] = 1
+                        trajek.SetNewWaypoint(n_Wp)
 #                    if (channel[8] == 1 and VRBOld != channel[6]):
 #                        delta = VRBOld - channel[6]
 #                        VRBOld = channel[6]
@@ -380,37 +388,33 @@ if __name__ == '__main__':
                 else:
                     geschrieben = False
                 tmonH5 = round(time.monotonic(), 2) #100Hz
-                if(tmonH5-tmonCFoldH5 > 0):
+                if(tmonH5-tmonCFoldH5 > 0.03):#25Hz
                     tmonCFoldH5 = tmonH5
-                    if(countH5cuw50Hz > 2):#fuer 25Hz
-                        countH5cuw50Hz = 0
-                        if (countH5cuw<maxH5countH5cuw):
-                            dsetH5cuw[countH5cuw, 0] = chSend[1]
-                            dsetH5cuw[countH5cuw, 1] = chSend[2]
-                            dsetH5cuw[countH5cuw, 2] = chSend[3]
-                            dsetH5cuw[countH5cuw, 3] = chSend[4]
-                            dsetH5cuw[countH5cuw, 4] = chSend[5]
-                            dsetH5cuw[countH5cuw, 5] = taster[1]
-                            for i in range(0, 3):
-                                dsetH5cuw[countH5cuw, 6+i] = sens.istgyr[i]
-                                dsetH5cuw[countH5cuw, 9+i] = sens.gyr_raw[i]
-                                dsetH5cuw[countH5cuw, 12+i] = sens.acc_raw[i]
-                                dsetH5cuw[countH5cuw, 15+i] = sens.accOhneG[i]
-                                dsetH5cuw[countH5cuw, 18+i] = sens.accogWorld[i]
-                                dsetH5cuw[countH5cuw, 21+i] = sens.vVehicle[i]
-                                dsetH5cuw[countH5cuw, 24+i] = sens.vWorld[i]
-                                dsetH5cuw[countH5cuw, 27+i] = sens.pos[i]
-                            if(isinstance(sens.gps.lat, float)):
-                                dsetH5cuw[countH5cuw, 30] = sens.gps.lat
-                                dsetH5cuw[countH5cuw, 31] = sens.gps.lon
-                            dsetH5cuw[countH5cuw, 35] = channel[10] + 2
-                            #print("asfafsaf")
-                            #print(countH5cuw, dsetH5cuw[countH5cuw, 35])
-                            #print("x", sens.accogWorld[0]*100)
-                            #print("y", sens.accogWorld[1]*100)
-                            countH5cuw = countH5cuw + 1
-                    else:
-                        countH5cuw50Hz = countH5cuw50Hz + 1
+                    if (countH5cuw<maxH5countH5cuw):
+                        dsetH5cuw[countH5cuw, 0] = chSend[1]
+                        dsetH5cuw[countH5cuw, 1] = chSend[2]
+                        dsetH5cuw[countH5cuw, 2] = chSend[3]
+                        dsetH5cuw[countH5cuw, 3] = chSend[4]
+                        dsetH5cuw[countH5cuw, 4] = chSend[5]
+                        dsetH5cuw[countH5cuw, 5] = taster[1]
+                        for i in range(0, 3):
+                            dsetH5cuw[countH5cuw, 6+i] = sens.istgyr[i]
+                            dsetH5cuw[countH5cuw, 9+i] = sens.gyr_raw[i]
+                            dsetH5cuw[countH5cuw, 12+i] = sens.acc_raw[i]
+                            dsetH5cuw[countH5cuw, 15+i] = sens.accOhneG[i]
+                            dsetH5cuw[countH5cuw, 18+i] = sens.accogWorld[i]
+                            dsetH5cuw[countH5cuw, 21+i] = sens.vVehicle[i]
+                            dsetH5cuw[countH5cuw, 24+i] = sens.vWorld[i]
+                            dsetH5cuw[countH5cuw, 27+i] = sens.pos[i]
+                        if(isinstance(sens.gps.lat, float)):
+                            dsetH5cuw[countH5cuw, 30] = sens.gps.lat
+                            dsetH5cuw[countH5cuw, 31] = sens.gps.lon
+                        dsetH5cuw[countH5cuw, 35] = channel[10] + 2
+                        #print("asfafsaf")
+                        #print(countH5cuw, dsetH5cuw[countH5cuw, 35])
+                        #print("x", sens.accogWorld[0]*100)
+                        #print("y", sens.accogWorld[1]*100)
+                        countH5cuw = countH5cuw + 1
                 #//////////////////////////////log//////////////////////////////
                 #print(time.monotonic()-timeOld)
                 #timeOld = time.monotonic()

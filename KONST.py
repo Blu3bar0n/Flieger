@@ -29,6 +29,7 @@ ethconn = False #eth0 nicht angeschlossen
 Filename = ""
 MAGKALLIBFILENAME = "/home/odroid/Desktop/ericWorkspace/Python/LOG/aMagKallib.txt"
 ERDRADIUS = 6371000 # in m
+Flughoehe = 50
 
 def RMatrixWeltZuFahrzeug(vektor, winkel): #http://www.chrobotics.com/library/understanding-euler-angles
     w = winkel[2]                 #in Rad nicht in Grad !!!!!
