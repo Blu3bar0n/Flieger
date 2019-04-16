@@ -22,6 +22,7 @@ def Process(qchild_led,qparent_led):
     sumV = 12.0
     try:
         while True:
+            time.sleep(0.1) #Timing für 10 Hz nicht präziese und langweilig
             #print (sumV)
             if (qchild_led.poll() == True):
                 showstate =  qchild_led.recv()

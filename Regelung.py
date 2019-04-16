@@ -23,6 +23,16 @@ class REGELUNG():
     pidPitch.setKi(kiPitch)
     pidPitch.setKd(kdPitch)
     pidPitch.setWindup(0.25)
+    
+    pidYaw = PID.PID()
+    kpYaw = 9.0
+    kiYaw = 0.5
+    kdYaw = 1.0
+    pidYaw.setKp(kpYaw)
+    pidYaw.setKi(kiYaw)
+    pidYaw.setKd(kdYaw)
+    pidYaw.setWindup(0.25)
+    
     acc = [0.0,0.0,0.0]
     accOhneG = [0.0,0.0,0.0]
     accogWorld = [0.0,0.0,0.0]
@@ -35,6 +45,7 @@ class REGELUNG():
     magKallib = [0.0, 0.0,0.0]
     magWorld = [0.0, 0.0, 0.0]
     istgyr = [0.0,0.0,0.0]
+    trajektorie = [0.0,0.0,0.0]
     state = 0
     channel = KONST.CHDEFREG
     oldChSend = KONST.OLDCHSENDDEF
@@ -72,10 +83,6 @@ class REGELUNG():
     
     def ControllRoll(self, sollRoll):
         istRoll = self.istgyr[0]
-        #speed = servo.getPosition(3)
-        #speed = 2000*4
-        #speed = (speed/4-1000)/1000
-        #print speed
         abweichung = sollRoll - istRoll
         abweichung = self.ShiftInRange(abweichung,-180,180)
         abweichung = abweichung/180
@@ -91,13 +98,36 @@ class REGELUNG():
         #print("pwm: ",pwm)
         return steuerung
         
+    def ControllYaw(self, sollYaw):
+        istYaw = self.istgyr[2]
+        abweichung = sollYaw - istYaw
+        abweichung = self.ShiftInRange(abweichung,-180,180)
+        abweichung = abweichung/180
+        #print "abweichung", abweichung
+        self.pidYaw.update(abweichung)
+        steuerung = self.MaxAbsWert(self.pidYaw.output,-1,1)
+        if(abweichung < 0):
+            if(self.gyr_raw[0] > KONST.MINWRONGANGLESPEED and abs(abweichung)*180 > 8):
+                steuerung = 1
+        else:
+            if(self.gyr_raw[0] < (- KONST.MINWRONGANGLESPEED) and abs(abweichung)*180 > 8):
+                steuerung = -1
+        #print("pwm: ",pwm)
+        return steuerung
+    
+    def ControllSpeed(self):
+        steuerung = 0.0001 * self.istgyr[1] * self.istgyr[1] + 0.0208 * self.istgyr[1] + 0.25
+        if(KONST.ethconn == True):
+            steuerung = -1.0
+        return steuerung
+    
     def ControllPitch(self, sollPitch):
         istPitch = self.istgyr[1]
-        #speed = servo.getPosition(3)
-        #speed = 2000*4
-        #speed = (speed/4-1000)/1000
-        #print speed
-        abweichung = sollPitch - istPitch
+        if(sollPitch>1000):
+            abweichung = 0
+        else:
+            abweichung = sollPitch - istPitch
+        
         abweichung = self.ShiftInRange(abweichung,-180,180)
         abweichung = abweichung/180
         #print "abweichung", abweichung
@@ -110,6 +140,9 @@ class REGELUNG():
             if(self.gyr_raw[1] < (- KONST.MINWRONGANGLESPEED) and abs(abweichung)*180 > 8):
                 steuerung = -1
         #print("pwm: ",pwm)
+        if(sollPitch>1000):
+            steuerung = sollPitch / 1000 - 5
+            
         return steuerung
     
     def Landeklappen (self):
@@ -173,6 +206,7 @@ def Process(qparent_reg,  qchild_reg):
                         reg.istgyr[i] = dataFromRegleung[4][i] 
                         reg.vVehicle[i] = dataFromRegleung[5][i]
                         reg.pos[i] = dataFromRegleung[6][i] 
+                        reg.trajektorie = dataFromRegleung[7][i] 
                 #/////////////////////////////////////Verarbeitung////////////////
                 if(reg.state == 0):
                     reg.ServoOut()
@@ -184,6 +218,15 @@ def Process(qparent_reg,  qchild_reg):
                     reg.channel[2] = p
                     reg.ServoOut()
                 if(reg.state == 2):
+                    r = reg.ControllRoll(reg.trajektorie[0])
+                    p = reg.ControllPitch(reg.trajektorie[1])
+                    y = reg.ControllYaw(reg.trajektorie[2])
+                    s = reg.ControllSpeed()
+                    reg.channel[1] = r
+                    reg.channel[5] = r
+                    reg.channel[2] = p
+                    reg.channel[4] = y
+                    reg.channel[3] = s
                     reg.ServoOut()
                 #///////////Send back to Log////////////////////
                 if (qparent_reg.poll() == False):

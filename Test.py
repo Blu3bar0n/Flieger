@@ -12,6 +12,7 @@ from pathlib import Path
 import Sensorfusion
 import Regelung
 import Trajektorie
+import math
 
 eth = open("/sys/class/net/eth0/operstate","r")
 streth = eth.read(2)
@@ -44,6 +45,7 @@ maxAbsAcc = [0.0,0.0,0.0]
 geschrieben = False
 kalibdone = False
 
+#init log
 switchOld = -1
 VRBOld = 0
 countLogfile = 0
@@ -69,10 +71,11 @@ if(tmonCFoldH5 > 2000000.0):
     exit()
 #timeOld = 0
 
-print(type(maxAbsGyr[1]), dsetH5cuw.dtype)
+#print(type(maxAbsGyr[1]), dsetH5cuw.dtype)
 logstr = ""
+# init log ende
 
-dataForRegleung = [[0.0], [0.0, 0.0,0.0,-1.0,0.0,0.0,-1.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0], [0.0,0.0,0.0],[0.0,0.0,0.0, 0.0] ] #[state, channels, gyr,accOhneG,istgyr,vVehicle,pos, Trajektorie ]
+dataForRegleung = [[0.0], [0.0, 0.0,0.0,-1.0,0.0,0.0,-1.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0], [0.0,0.0,0.0],[0.0,0.0,0.0] ] #[state, channels, gyr,accOhneG,istgyr,vVehicle,pos, Trajektorie ]
 
 #////////////////////////////funktionen//////////////////////////////////
 def FiSoEx(arr=None):
@@ -111,7 +114,7 @@ if __name__ == '__main__':
     mp.set_start_method('spawn') #nur einmal angeben!!
     q_gps = mp.Queue()
     p_gps = mp.Process(target=GPSDevice.Process,  args=(q_gps, ))
-    p_gps.start()
+    #p_gps.start()
     print("GPS alive: ", p_gps.is_alive())
     qparent_fs,  qchild_fs = mp.Pipe()
     p_fs = mp.Process(target=FSiA10B.Process,  args=(qchild_fs,qparent_fs ))
@@ -119,19 +122,19 @@ if __name__ == '__main__':
     print("FSiA10B alive: ", p_fs.is_alive())
     qparent_bmi,  qchild_bmi = mp.Pipe()
     p_bmi = mp.Process(target=BMI160.Process,  args=(qchild_bmi, qparent_bmi))
-    p_bmi.start()
+    #p_bmi.start()
     print("BMI160 alive: ", p_bmi.is_alive())
     qparent_led,  qchild_led = mp.Pipe()
     p_led = mp.Process(target=LED.Process,  args=(qchild_led, qparent_led))
-    p_led.start()
+    #p_led.start()
     print("Led alive: ", p_led.is_alive())
     qparent_sens,  qchild_sens = mp.Pipe()
     p_sens = mp.Process(target=Sensorfusion.Process,  args=(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps))
-    p_sens.start()
+    #p_sens.start()
     print("Sensorfusion alive: ", p_sens.is_alive())
     qparent_reg,  qchild_reg = mp.Pipe()
     p_reg = mp.Process(target=Regelung.Process,  args=(qparent_reg,  qchild_reg))
-    p_reg.start()
+    #p_reg.start()
     print("Regelung alive: ", p_reg.is_alive())
     print("Prozesse gestartet")
     
@@ -161,6 +164,7 @@ if __name__ == '__main__':
                 qparent_reg.send(dataForRegleung)
         else:
             qparent_led.send(KONST.kallib)
+        time.sleep(0.05)
     channel = KONST.CHDEF
     #/////////////////////////MAG Kallib ///////////////////////////
     print("MAG Kallib")
@@ -242,8 +246,12 @@ if __name__ == '__main__':
     #qparent_sens.send(1)
     try:
         print("while start")
+        #newRun = time.monotonic()+0.01
         while(True ):
             try:
+                #time.sleep(newRun - time.monotonic())
+                #newRun = time.monotonic()+0.01 #100Hz Timing
+                
                 #print("run")
 #                if (q_gps.empty() == False):
 #                    gps = q_gps.get()
@@ -285,7 +293,7 @@ if __name__ == '__main__':
                         dataForRegleung[4][i] = sens.istgyr[i]
                         dataForRegleung[5][i] = sens.vVehicle[i]
                         dataForRegleung[6][i] = sens.pos[i]
-                #print(channel[1])
+                #print(channel[10])
                 if (channel[10]== -1):    #//////////////////////////////SWC oben
                     qparent_led.send(KONST.manuell)
                     if (switchOld != -1):
@@ -315,8 +323,8 @@ if __name__ == '__main__':
                         switchOld = 1
                         trajek.SetOldWaypoint(sens.pos)
                         n_Wp = [0.0, 0.0, 0.0, 0.0, 0.0]
-                        n_Wp[0] = sens.pos[0]
-                        n_Wp[1] = sens.pos[1]
+                        n_Wp[0] = sens.pos[0] + math.cos(sens.istgyr[2] / 180 * math.pi) *  0.004 #440m
+                        n_Wp[1] = sens.pos[1] + math.sin(sens.istgyr[2] / 180 * math.pi) *  0.004 #440m
                         n_Wp[2] = sens.pos[2]
                         n_Wp[4] = 1
                         trajek.SetNewWaypoint(n_Wp)
@@ -346,6 +354,7 @@ if __name__ == '__main__':
 #                        logstr = logstr + "Neuer Kd"+str(kd)+'\n'
 #                    if (channel[7] == -1 and channel[8] == -1 and channel[9] == -1):
 #                        VRBOld = channel[6]
+                    dataForRegleung[7] = trajek.StupidControl(sens.pos, sens.istgyr)
                     if(qchild_reg.poll() == False):
                         dataForRegleung[0][0] = 2
                         for i in range (1, 7):

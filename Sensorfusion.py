@@ -99,7 +99,7 @@ class SENS():
         if(tmon-self.tmonCFoldMag > 0.141): #alle 0,15s
             self.tmonCFoldMag = tmon
             yagyr = math.atan2(self.mag_raw[1], self.mag_raw[0]) * 180 / math.pi #pitch from Acc
-            print("yaw mag", yagyr)
+            #print("yaw mag", self.mag_raw, yagyr)
             if(abs(self.istgyr[2] - yagyr)<180):
                 self.istgyr[2] = self.istgyr[2] * 0.95 + yagyr * 0.05
             else:

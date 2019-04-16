@@ -45,7 +45,7 @@ class BMI160():
     MAG_POWER_DATA = 0b00000001
     MAG_OPERATION_MODE = 0x4C
     MAG_OPERATION_MODE_DATA = 0b00000001
-    
+
     BMM150_I2C_ADDR = 0x10
     BMM_CONTROL = MAG_OPERATION_MODE
     BMM_CONTROL_DATA = MAG_OPERATION_MODE_DATA
@@ -53,7 +53,7 @@ class BMI160():
     BMM_DATA = 0x42
     BMM_AXES_ENABLE = 0x4E
     BMM_AXES_ENABLE_DATA = 0b00000111
-    
+
     BMM150_REGULAR_REPXY = 4
     BMM150_REP_XY_ADDR = 0x51
     BMM150_REGULAR_REPZ = 14
@@ -77,7 +77,7 @@ class BMI160():
     BMM150_DIG_XY2 = 0x70
     BMM150_DIG_XY1 = 0x71
     BMM150_OVERFLOW_OUTPUT_FLOAT = 0.0
-    
+
     dig_x1 = 0
     dig_y1 = 0
     dig_x2 = 0
@@ -90,8 +90,8 @@ class BMI160():
     dig_xy2 = 0
     dig_xyz1 = 0
 
-    
-    
+
+
     gyr = [0.0,0.0,0.0]
     acc = [0.0,0.0,0.0]
     mag = [0.0,0.0,0.0]
@@ -108,7 +108,7 @@ class BMI160():
     akallibz = 0.0
     tmonCFold = 0.0
     #minAcc = 0.05
-    
+
     dataToSend = [[0.0,0.0,0.0, 0.0, 0], [0.0,0.0,0.0, 0.0, 0], [0.0,0.0,0.0, 0.0, 0]] # gyr, acc, mag, [x,y,z,dTime,isNewData]
 
     def Kallib(self):
@@ -163,8 +163,8 @@ class BMI160():
         print (self.kallibz)
         print (countz)
         print (sumz)
-                
-    
+
+
 
     def InitRead(self):
         print ("BMI160 read init")
@@ -230,7 +230,7 @@ class BMI160():
                 #print "new gyr data"
                 gyr_raw = self.bus.read_i2c_block_data(self.BMI160_I2C_ADDR,0x0C,6)
                 lgyr = [gyr_raw[0] + (gyr_raw[1]<<8), gyr_raw[2] + (gyr_raw[3]<<8), gyr_raw[4] + (gyr_raw[5]<<8)]
-                
+
                 faktor = 1.0 / (self.ZWEI_BYTE_MAX / 2.0) * self.GYR_RANGE_DATA_IN_GRAD_SEC
                 if (lgyr[0] > self.ZWEI_BYTE_MAX/2):
                     lgyr[0] = lgyr[0] - self.ZWEI_BYTE_MAX
@@ -245,7 +245,7 @@ class BMI160():
                 deltaTime = self.sensortime - self.sensortimeOldGyr
                 self.sensortimeOldGyr = self.sensortime
                 deltaTime = deltaTime * self.SENSORTIME_INCREMENT
-                
+
                 if(self.dataToSend[0][4] == 0):
                     self.dataToSend[0][4] = 1
                     for i in range(0, 3):
@@ -278,7 +278,7 @@ class BMI160():
                 deltaTime = self.sensortime - self.sensortimeOldAcc
                 self.sensortimeOldAcc = self.sensortime
                 deltaTime = deltaTime * self.SENSORTIME_INCREMENT
-                
+
                 if(self.dataToSend[1][4] == 0):
                     self.dataToSend[1][4] = 1
                     for i in range(0, 3):
@@ -289,9 +289,9 @@ class BMI160():
                     for i in range(0, 3):
                        self.dataToSend[1][i] = (self.dataToSend[1][i] * self.dataToSend[1][3] + self.acc[i] * deltaTime)/(deltaTime + self.dataToSend[1][3])
                     self.dataToSend[1][3] = deltaTime + self.dataToSend[1][3]
-                
+
                 #self.Positionsbestimmung(deltaTime)
-                
+
         except KeyboardInterrupt: 
             exit()
         except Exception as e:
@@ -305,7 +305,7 @@ class BMI160():
                 if (str(e) == "[Errno 6] No such device or address"):
                     self.InitRead()
                 pass
-    
+
     def ReadOnceMag(self):
         try:
             id = self.bus.read_byte_data(self.BMM150_I2C_ADDR, 0x40)
@@ -348,7 +348,7 @@ class BMI160():
                 self.dataToSend[2][4] = 1
                 for i in range(0, 3):
                    self.dataToSend[2][i] = self.mag[i]
-                
+
         except KeyboardInterrupt: 
             exit()
         except Exception as e:
@@ -425,7 +425,7 @@ class BMI160():
         self.dig_xy2 = trim_xy1xy2[8]
         temp_msb = ((trim_xy1xy2[5] & 0x7F)) << 8
         self.dig_xyz1 = (temp_msb | trim_xy1xy2[4])
-    
+
     def MagKallib(self, qchild_bmi):
         self.magKallib = [0.0, 0.0,0.0]
         timeold = time.monotonic()
@@ -438,15 +438,16 @@ class BMI160():
             count = count + 1
         for i in range(0, 3):
             sumvorne[i] = sumvorne[i] / count
-            print(sumvorne[i])
+            print(sumvorne[i], count)
         qchild_bmi.send(1)
         print("bmm Voren Done")
-        
+
         while( qchild_bmi.poll() == False):
             time.sleep(0.01)
+            self.ReadOnceMag()
         while( qchild_bmi.poll() == True):
             qchild_bmi.recv()
-            
+
         timeold = time.monotonic()
         sumrechts = [0.0, 0.0, 0.0]
         count = 0
@@ -457,15 +458,16 @@ class BMI160():
             count = count + 1
         for i in range(0, 3):
             sumrechts[i] = sumrechts[i] / count
-            print(sumrechts[i])
+            print(sumrechts[i], count)
         qchild_bmi.send(2)
         print("bmm Rechts Done")
-        
+
         while( qchild_bmi.poll() == False):
             time.sleep(0.01)
+            self.ReadOnceMag()
         while( qchild_bmi.poll() == True):
             qchild_bmi.recv()
-            
+
         timeold = time.monotonic()
         sumhinten = [0.0, 0.0, 0.0]
         count = 0
@@ -476,15 +478,16 @@ class BMI160():
             count = count + 1
         for i in range(0, 3):
             sumhinten[i] = sumhinten[i] / count
-            print(sumhinten[i])
+            print(sumhinten[i], count)
         qchild_bmi.send(3)
         print("bmm Hinten Done")
-        
+
         while( qchild_bmi.poll() == False):
             time.sleep(0.01)
+            self.ReadOnceMag()
         while( qchild_bmi.poll() == True):
             qchild_bmi.recv()
-            
+
         timeold = time.monotonic()
         sumlinks = [0.0, 0.0, 0.0]
         count = 0
@@ -495,14 +498,18 @@ class BMI160():
             count = count + 1
         for i in range(0, 3):
             sumlinks[i] = sumlinks[i] / count
-            print(sumlinks[i])
+            print(sumlinks[i], count)
         qchild_bmi.send(4)
         for i in range(0, 3):
             self.magKallib[i] = (sumvorne[i] + sumrechts[i] + sumhinten[i] + sumlinks[i]) / 4
         print("bmm Links Done")
-        
+
         kallibtxt = open(KONST.MAGKALLIBFILENAME,"w")
         print(self.magKallib)
+        print(sumvorne)
+        print(sumrechts)
+        print(sumhinten)
+        print(sumlinks)
         msg = str(self.magKallib[0]) + '\n' + str(self.magKallib[1]) + '\n' + str(self.magKallib[2]) + '\n'
         kallibtxt.write(msg)
         kallibtxt.close()
@@ -525,12 +532,14 @@ def Process(qchild_bmi, qparent_bmi):
         time.sleep(0.01)
         magkallibstate = -1
     while(magkallibstate != 0):
+        bmi160.ReadOnceMag()
         if (qchild_bmi.poll() == True):
             magkallibstate =  qchild_bmi.recv()
-        print("hkjhkadfjafbdkjghskdhgjksdhkdjhgkj")
+        #print("hkjhkadfjafbdkjghskdhgjksdhkdjhgkj")
         if(magkallibstate==1):
             bmi160.MagKallib(qchild_bmi)
             magkallibstate  = -1
+    print("bmi160.magKallib", bmi160.magKallib)
     try:
         print ("BMI einsatzbereit")
         #timeold = 0.0
