@@ -1,5 +1,5 @@
 
-#import time
+import time
 #import math
 import KONST
 import PID
@@ -192,8 +192,24 @@ def Process(qparent_reg,  qchild_reg):
 
     print("Pids gesetzt")
     try:
-        while(True):
+       #init für kopf
+        SCHRITTWEITE = 0.010
+        tol = SCHRITTWEITE*1.1
+        newRun = time.monotonic()+SCHRITTWEITE
+        #init end kopf
+        while (True):
             try:
+                #kopf für while Timing
+                test = newRun - time.monotonic()
+                if(test>0 and test < tol):
+                    time.sleep(test)
+                else:
+                    print("regelung test<0 oder > Schrerittweite +0.001")
+                    print(test)
+                    newRun =  time.monotonic()+SCHRITTWEITE
+                #print("dauer für den letzten zeitschritt")
+                newRun = newRun+SCHRITTWEITE#Hz Timing
+                #ende kopf
                 #///////////////////////////////Get Data///////////////////
                 if (qchild_reg.poll() == True):
                     dataFromRegleung = qchild_reg.recv()
@@ -236,7 +252,7 @@ def Process(qparent_reg,  qchild_reg):
                 exit()
             except Exception as e:
                 log = open(KONST.Filename,"a")
-                errmsg = "Unexpectet Error in Sensorfusion:" + '\n' + str(e) + '\n'
+                errmsg = "Unexpectet Error in Regelung:" + '\n' + str(e) + '\n'
                 log.write(errmsg)
                 log.close()
                 if(KONST.ethconn):
@@ -247,5 +263,5 @@ def Process(qparent_reg,  qchild_reg):
     except KeyboardInterrupt: 
         exit()
     except:
-        print ("Unexpected Error BMI")
+        print ("Unexpected Error Regelung")
         raise

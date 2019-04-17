@@ -32,7 +32,7 @@ class FSiA10B():
                 if(test>0 and test < tol):
                     time.sleep(test)
                 else:
-                    print("test<0 oder > Schrerittweite +0.001")
+                    print("fsia10b test<0 oder > Schrerittweite +0.001")
                     print(test)
                     newRun =  time.monotonic()+SCHRITTWEITE
                 #print("dauer für den letzten zeitschritt")
@@ -48,7 +48,7 @@ class FSiA10B():
                 
                 #print("lenght:", lenght)
                 if (lenght > 0 and lenght < 70):
-                    print("lenght:", lenght)
+                    #print("lenght:", lenght)
                     line = self.ser.read(lenght)
                     if (len(line) == 32):
                         #for i in range(0,16):          #Debug in hex
@@ -77,7 +77,7 @@ class FSiA10B():
                             self.channel[i] = (data[i]-1500.0)/500.0
                         if (qparent_fs.poll() == False):
                             qchild_fs.send(self.channel)
-                        print("FSiA10B channel[10]", self.channel[10])
+                        #print("FSiA10B channel[10]", self.channel[10])
                     else:
                         print("buffer flushed",  lenght)
 

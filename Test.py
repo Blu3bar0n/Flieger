@@ -114,7 +114,7 @@ if __name__ == '__main__':
     mp.set_start_method('spawn') #nur einmal angeben!!
     q_gps = mp.Queue()
     p_gps = mp.Process(target=GPSDevice.Process,  args=(q_gps, ))
-    #p_gps.start()
+    p_gps.start()
     print("GPS alive: ", p_gps.is_alive())
     qparent_fs,  qchild_fs = mp.Pipe()
     p_fs = mp.Process(target=FSiA10B.Process,  args=(qchild_fs,qparent_fs ))
@@ -122,19 +122,19 @@ if __name__ == '__main__':
     print("FSiA10B alive: ", p_fs.is_alive())
     qparent_bmi,  qchild_bmi = mp.Pipe()
     p_bmi = mp.Process(target=BMI160.Process,  args=(qchild_bmi, qparent_bmi))
-    #p_bmi.start()
+    p_bmi.start()
     print("BMI160 alive: ", p_bmi.is_alive())
     qparent_led,  qchild_led = mp.Pipe()
     p_led = mp.Process(target=LED.Process,  args=(qchild_led, qparent_led))
-    #p_led.start()
+    p_led.start()
     print("Led alive: ", p_led.is_alive())
     qparent_sens,  qchild_sens = mp.Pipe()
     p_sens = mp.Process(target=Sensorfusion.Process,  args=(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps))
-    #p_sens.start()
+    p_sens.start()
     print("Sensorfusion alive: ", p_sens.is_alive())
     qparent_reg,  qchild_reg = mp.Pipe()
     p_reg = mp.Process(target=Regelung.Process,  args=(qparent_reg,  qchild_reg))
-    #p_reg.start()
+    p_reg.start()
     print("Regelung alive: ", p_reg.is_alive())
     print("Prozesse gestartet")
     
@@ -246,11 +246,8 @@ if __name__ == '__main__':
     #qparent_sens.send(1)
     try:
         print("while start")
-        #newRun = time.monotonic()+0.01
         while(True ):
             try:
-                #time.sleep(newRun - time.monotonic())
-                #newRun = time.monotonic()+0.01 #100Hz Timing
                 
                 #print("run")
 #                if (q_gps.empty() == False):
@@ -319,7 +316,7 @@ if __name__ == '__main__':
                 if (channel[10] == 1):#/////////////////////////////////SWC unten
                     qparent_led.send(KONST.vollAutonom)
                     if (switchOld != 1):
-                        logstr = logstr + "Flugsteuerung: change pid"+'\n'
+                        logstr = logstr + "Flugsteuerung: autonom"+'\n'
                         switchOld = 1
                         trajek.SetOldWaypoint(sens.pos)
                         n_Wp = [0.0, 0.0, 0.0, 0.0, 0.0]
