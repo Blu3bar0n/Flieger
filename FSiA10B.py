@@ -32,8 +32,8 @@ class FSiA10B():
                 if(test>0 and test < tol):
                     time.sleep(test)
                 else:
-                    print("fsia10b test<0 oder > Schrerittweite +0.001")
-                    print(test)
+                    #print("fsia10b test<0 oder > Schrerittweite +0.001")
+                    #print(test)
                     newRun =  time.monotonic()+SCHRITTWEITE
                 #print("dauer für den letzten zeitschritt")
                 newRun = newRun+SCHRITTWEITE#Hz Timing

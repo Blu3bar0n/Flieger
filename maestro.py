@@ -28,7 +28,7 @@ class Controller:
     # assumes.  If two or more controllers are connected to different serial
     # ports, or you are using a Windows OS, you can provide the tty port.  For
     # example, '/dev/ttyACM2' or for Windows, something like 'COM3'.
-    def __init__(self,ttyStr='/dev/ttyACM1',device=0x0c): #std: /dev/ttyACM0
+    def __init__(self,ttyStr='/dev/serial/by-id/usb-Pololu_Corporation_Pololu_Mini_Maestro_12-Channel_USB_Servo_Controller_00211345-if00',device=0x0c): #std: /dev/ttyACM0
         # Open the command port
         self.usb = serial.Serial(ttyStr) #serial.Serial('/dev/ttySAC2', 115200, serial.EIGHTBITS, serial.PARITY_NONE,serial.STOPBITS_ONE)
         # Command lead-in and device number are sent for each Pololu serial command.
@@ -48,10 +48,12 @@ class Controller:
 
     # Send a Pololu command out the serial port
     def sendCmd(self, cmd):
+        #print("cmd", cmd)
         cmdStr = self.PololuCmd + cmd
         if PY2:
             self.usb.write(cmdStr)
         else:
+            #print("cmdStr",bytes(cmdStr,'latin-1'))
             self.usb.write(bytes(cmdStr,'latin-1'))
 
     # Set channels min and max value range.  Use this as a safety to protect
@@ -137,7 +139,7 @@ class Controller:
     # it is not stalled or slowed.
     def getPosition(self, chan):
         cmd = chr(0x10) + chr(chan)
-        print (cmd)
+        #print (cmd)
         self.sendCmd(cmd)
         lsb = ord(self.usb.read())
         msb = ord(self.usb.read())
@@ -181,3 +183,17 @@ class Controller:
         cmd = chr(0x24)
         self.sendCmd(cmd)
 
+   # Not available with Micro Maestro.
+    def getErrors(self):
+        cmd = chr(0x21)
+        #print("cmd error", cmd)
+        self.sendCmd(cmd)
+        length = self.usb.in_waiting
+        if(length > 0):
+            #print("errorlength", length)
+            if(length ==2):
+                error = self.usb.read(length)
+                #if (error != b'\x00\x00'):
+                print("error:", error)
+            else:
+                self.usb.reset_input_buffer()

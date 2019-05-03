@@ -20,6 +20,14 @@ eth.close()
 print (streth)
 if(streth == "up"):
     KONST.ethconn = True
+else:
+    eth = open("/sys/class/net/wlan0/operstate","r")
+    streth = eth.read(2)
+    eth.close()
+    print (streth)
+    if(streth == "up"):
+        KONST.ethconn = True
+
 landelappen = 200
 maxSpeed = 75
 minSpeedForDropSteuerung = 15
@@ -75,7 +83,7 @@ if(tmonCFoldH5 > 2000000.0):
 logstr = ""
 # init log ende
 
-dataForRegleung = [[0.0], [0.0, 0.0,0.0,-1.0,0.0,0.0,-1.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0], [0.0,0.0,0.0],[0.0,0.0,0.0] ] #[state, channels, gyr,accOhneG,istgyr,vVehicle,pos, Trajektorie ]
+dataForRegleung = [[0.0], [0.0, 0.0,0.0,-1.0,0.0,0.0,-1.0],[0.0,0.0,0.0], [0.0] ] #[state, channels, Trajektorie, zusatzservo ]
 
 #////////////////////////////funktionen//////////////////////////////////
 def FiSoEx(arr=None):
@@ -129,11 +137,12 @@ if __name__ == '__main__':
     p_led.start()
     print("Led alive: ", p_led.is_alive())
     qparent_sens,  qchild_sens = mp.Pipe()
-    p_sens = mp.Process(target=Sensorfusion.Process,  args=(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps))
+    qparent_sens_reg,  qchild_sens_reg = mp.Pipe()
+    p_sens = mp.Process(target=Sensorfusion.Process,  args=(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps, qparent_sens_reg,  qchild_sens_reg))
     p_sens.start()
     print("Sensorfusion alive: ", p_sens.is_alive())
     qparent_reg,  qchild_reg = mp.Pipe()
-    p_reg = mp.Process(target=Regelung.Process,  args=(qparent_reg,  qchild_reg))
+    p_reg = mp.Process(target=Regelung.Process,  args=(qparent_reg,  qchild_reg, qparent_sens_reg,  qchild_sens_reg))
     p_reg.start()
     print("Regelung alive: ", p_reg.is_alive())
     print("Prozesse gestartet")
@@ -163,9 +172,13 @@ if __name__ == '__main__':
                    dataForRegleung[1][i] = chSend[i]
                 qparent_reg.send(dataForRegleung)
         else:
-            qparent_led.send(KONST.kallib)
+            if (qchild_reg.poll() == False):
+                qparent_led.send(KONST.kallib)
         time.sleep(0.05)
     channel = KONST.CHDEF
+    for i in range (1, 7):
+       dataForRegleung[1][i] = channel[i]
+    qparent_reg.send(dataForRegleung)
     #/////////////////////////MAG Kallib ///////////////////////////
     print("MAG Kallib")
     tasterReleased = 0
@@ -246,8 +259,24 @@ if __name__ == '__main__':
     #qparent_sens.send(1)
     try:
         print("while start")
-        while(True ):
+        #init für kopf
+        SCHRITTWEITE = 0.010
+        tol = SCHRITTWEITE*1.1
+        newRun = time.monotonic()+SCHRITTWEITE
+        #init end kopf
+        while (True):
             try:
+                #kopf für while Timing
+                timetest = newRun - time.monotonic()
+                if(timetest>0 and timetest < tol):
+                    time.sleep(timetest)
+                else:
+                    #print("Test timetest<0 oder > Schrerittweite +0.001")
+                    #print(timetest)
+                    newRun =  time.monotonic()+SCHRITTWEITE
+                #print("dauer für den letzten zeitschritt")
+                newRun = newRun+SCHRITTWEITE#Hz Timing
+                #ende kopf
                 
                 #print("run")
 #                if (q_gps.empty() == False):
@@ -284,15 +313,10 @@ if __name__ == '__main__':
                     #print("pos:", sens.pos)
                     #print("Vehicle:", sens.vVehicle)
                     #qparent_sens.send(1)
-                    for i in range(0, 3):
-                        dataForRegleung[2][i] = sens.gyr_raw[i]                #[state, channels, gyr,accOhneG,istgyr,vVehicle,pos, Trajektorie ]
-                        dataForRegleung[3][i] = sens.accOhneG[i]
-                        dataForRegleung[4][i] = sens.istgyr[i]
-                        dataForRegleung[5][i] = sens.vVehicle[i]
-                        dataForRegleung[6][i] = sens.pos[i]
                 #print(channel[10])
                 if (channel[10]== -1):    #//////////////////////////////SWC oben
-                    qparent_led.send(KONST.manuell)
+                    if (qchild_led.poll() == False):
+                        qparent_led.send(KONST.manuell)
                     if (switchOld != -1):
                         logstr = logstr + "Flugsteuerung: Manuell"+'\n'
                         switchOld = -1
@@ -303,7 +327,8 @@ if __name__ == '__main__':
                         qparent_reg.send(dataForRegleung)
                     
                 if (channel[10] == 0):    #//////////////////////////////////////SWC mitte
-                    qparent_led.send(KONST.halbAutonom)
+                    if (qchild_led.poll() == False):
+                        qparent_led.send(KONST.halbAutonom)
                     if (switchOld != 0):
                         logstr = logstr +"Flugsteuerung: roll control"+'\n'
                         switchOld = 0
@@ -314,7 +339,8 @@ if __name__ == '__main__':
                         qparent_reg.send(dataForRegleung)
                 
                 if (channel[10] == 1):#/////////////////////////////////SWC unten
-                    qparent_led.send(KONST.vollAutonom)
+                    if (qchild_led.poll() == False):
+                        qparent_led.send(KONST.vollAutonom)
                     if (switchOld != 1):
                         logstr = logstr + "Flugsteuerung: autonom"+'\n'
                         switchOld = 1
@@ -351,7 +377,7 @@ if __name__ == '__main__':
 #                        logstr = logstr + "Neuer Kd"+str(kd)+'\n'
 #                    if (channel[7] == -1 and channel[8] == -1 and channel[9] == -1):
 #                        VRBOld = channel[6]
-                    dataForRegleung[7] = trajek.StupidControl(sens.pos, sens.istgyr)
+                    dataForRegleung[2] = trajek.StupidControl(sens.pos, sens.istgyr)
                     if(qchild_reg.poll() == False):
                         dataForRegleung[0][0] = 2
                         for i in range (1, 7):
@@ -394,7 +420,7 @@ if __name__ == '__main__':
                 else:
                     geschrieben = False
                 tmonH5 = round(time.monotonic(), 2) #100Hz
-                if(tmonH5-tmonCFoldH5 > 0.03):#25Hz
+                if(tmonH5-tmonCFoldH5 > 0.09):#10Hz
                     tmonCFoldH5 = tmonH5
                     if (countH5cuw<maxH5countH5cuw):
                         dsetH5cuw[countH5cuw, 0] = chSend[1]

@@ -53,6 +53,7 @@ class REGELUNG():
     servo = maestro.Controller()
     servo.setOffset(5,servoCh5off)
     servo.setRange(5,1000+servoCh5off,2000+servoCh5off)
+    zusatzservo = 0.0
     print("servo gestartet")
     
     
@@ -63,7 +64,7 @@ class REGELUNG():
             wert = wert - abs(oben-unten)
         return wert
     
-    def MaxAbsWert(wert,unten,oben):
+    def MaxAbsWert(self, wert,unten,oben):
         if wert < unten:
             wert = unten
         if wert > oben:
@@ -90,10 +91,10 @@ class REGELUNG():
         self.pidRoll.update(abweichung)
         steuerung = self.MaxAbsWert(self.pidRoll.output,-1,1)
         if(abweichung < 0):
-            if(self.gyr_raw[0] > KONST.MINWRONGANGLESPEED and abs(abweichung)*180 > 8):
+            if(self.gyr[0] > KONST.MINWRONGANGLESPEED and abs(abweichung)*180 > 8):
                 steuerung = 1
         else:
-            if(self.gyr_raw[0] < (- KONST.MINWRONGANGLESPEED) and abs(abweichung)*180 > 8):
+            if(self.gyr[0] < (- KONST.MINWRONGANGLESPEED) and abs(abweichung)*180 > 8):
                 steuerung = -1
         #print("pwm: ",pwm)
         return steuerung
@@ -107,10 +108,10 @@ class REGELUNG():
         self.pidYaw.update(abweichung)
         steuerung = self.MaxAbsWert(self.pidYaw.output,-1,1)
         if(abweichung < 0):
-            if(self.gyr_raw[0] > KONST.MINWRONGANGLESPEED and abs(abweichung)*180 > 8):
+            if(self.gyr[0] > KONST.MINWRONGANGLESPEED and abs(abweichung)*180 > 8):
                 steuerung = 1
         else:
-            if(self.gyr_raw[0] < (- KONST.MINWRONGANGLESPEED) and abs(abweichung)*180 > 8):
+            if(self.gyr[0] < (- KONST.MINWRONGANGLESPEED) and abs(abweichung)*180 > 8):
                 steuerung = -1
         #print("pwm: ",pwm)
         return steuerung
@@ -132,12 +133,13 @@ class REGELUNG():
         abweichung = abweichung/180
         #print "abweichung", abweichung
         self.pidPitch.update(abweichung)
+        #print("pidpitch", self.pidPitch.output)
         steuerung = self.MaxAbsWert(self.pidPitch.output,-1,1)
         if(abweichung < 0):
-            if(self.gyr_raw[1] > KONST.MINWRONGANGLESPEED and abs(abweichung)*180 > 8):
+            if(self.gyr[1] > KONST.MINWRONGANGLESPEED and abs(abweichung)*180 > 8):
                 steuerung = 1
         else:
-            if(self.gyr_raw[1] < (- KONST.MINWRONGANGLESPEED) and abs(abweichung)*180 > 8):
+            if(self.gyr[1] < (- KONST.MINWRONGANGLESPEED) and abs(abweichung)*180 > 8):
                 steuerung = -1
         #print("pwm: ",pwm)
         if(sollPitch>1000):
@@ -159,70 +161,62 @@ class REGELUNG():
                 self.servo.setOffset(1,0)
                 self.servo.setOffset(5,0 + self.servoCh5off)
 
-    def ServoOut(self, arr=None):
-        if(arr == None):
-            arr = self.channel
-#        if ((abs(self.istgyr[1])> KONST.MAXPITCH - KONST.MAXPITCHPUFFER) and (self.state != 0)):
-#            if (abs(self.istgyr[1])> KONST.MAXPITCH): #pitch zu krass
-#                if(self.istgyr[1]> 0):
-#                    self.channel[2] = -1
-#                    arr[2] = self.channel[2]
-#                else:
-#                    self.channel[2] = 1
-#                    arr[2] = self.channel[2]
-#            else:
-#                if(self.istgyr[1]> 0):       #pitch hoch und bewegung in die falsche Richtung
-#                    if(self.gyr_raw[1] > KONST.MINWRONGANGLESPEED):
-#                        self.channel[2] = -1
-#                        arr[2] = self.channel[2]
-#                else:
-#                    if(self.gyr_raw[1] < (- KONST.MINWRONGANGLESPEED)):
-#                        self.channel[2] = 1
-#                        arr[2] = self.channel[2]
-        #print(arr[1],  oldChSend[1])
+    def ServoOut(self):
+        count = 0
         for i in range(1,10):
-            if(arr[i] != self.oldChSend[i]):
-                self.servo.setTarget(i,arr[i])
-                self.oldChSend[i] = arr[i]
-                #print("fbadhfbajkbfkjagssffiasgizgfija")
+            if(self.channel[i] != self.oldChSend[i]):
+                self.servo.setTarget(i,self.channel[i])
+                self.oldChSend[i] = self.channel[i]
+                count = count + 1
+                #print("fbadhfbajkbfkjagssffiasgizgfija" , self.channel[i])
+        #print("Check error")
+        if(count > 0):
+            self.servo.getErrors()
 
 
-def Process(qparent_reg,  qchild_reg):
+def Process(qparent_reg,  qchild_reg, qparent_sens_reg,  qchild_sens_reg):
     reg = REGELUNG()
 
     print("Pids gesetzt")
     try:
        #init für kopf
-        SCHRITTWEITE = 0.010
+        SCHRITTWEITE = 0.0050
         tol = SCHRITTWEITE*1.1
         newRun = time.monotonic()+SCHRITTWEITE
         #init end kopf
         while (True):
             try:
                 #kopf für while Timing
-                test = newRun - time.monotonic()
-                if(test>0 and test < tol):
-                    time.sleep(test)
+                timetest = newRun - time.monotonic()
+                if(timetest>0 and timetest < tol):
+                    time.sleep(timetest)
                 else:
-                    print("regelung test<0 oder > Schrerittweite +0.001")
-                    print(test)
+                    #print("regelung timetest<0 oder > Schrittweite +0.001")
+                    #print(timetest)
                     newRun =  time.monotonic()+SCHRITTWEITE
                 #print("dauer für den letzten zeitschritt")
                 newRun = newRun+SCHRITTWEITE#Hz Timing
                 #ende kopf
                 #///////////////////////////////Get Data///////////////////
+                #data from main
                 if (qchild_reg.poll() == True):
-                    dataFromRegleung = qchild_reg.recv()
+                    dataFromRegleung = qchild_reg.recv() #[state, channels,Trajektorie ]
                     reg.state = dataFromRegleung[0][0]
                     for i in range (1, 7):
                         reg.channel[i] = dataFromRegleung[1][i]
                     for i in range(0, 3):
-                        reg.gyr[i]  = dataFromRegleung[2][i]              #[state, channels, gyr,accOhneG,istgyr,vVehicle,pos, Trajektorie ]
-                        reg.accOhneG[i] = dataFromRegleung[3][i]
-                        reg.istgyr[i] = dataFromRegleung[4][i] 
-                        reg.vVehicle[i] = dataFromRegleung[5][i]
-                        reg.pos[i] = dataFromRegleung[6][i] 
-                        reg.trajektorie = dataFromRegleung[7][i] 
+                        reg.trajektorie[i]  = dataFromRegleung[2][i] 
+                    reg.zusatzservo = dataFromRegleung[3][0] 
+                #data from sens
+                if (qchild_sens_reg.poll() == True):
+                    dataFromRegleung = qchild_sens_reg.recv() #[gyr,accOhneG,istgyr,vVehicle,vWorld, pos ]
+                    for i in range(0, 3):
+                        reg.gyr[i]  = dataFromRegleung[0][i]              
+                        reg.accOhneG[i] = dataFromRegleung[1][i]
+                        reg.istgyr[i] = dataFromRegleung[2][i] 
+                        reg.vVehicle[i] = dataFromRegleung[3][i]
+                        reg.vWorld[i] = dataFromRegleung[4][i] 
+                        reg.pos[i] = dataFromRegleung[5][i] 
                 #/////////////////////////////////////Verarbeitung////////////////
                 if(reg.state == 0):
                     reg.ServoOut()

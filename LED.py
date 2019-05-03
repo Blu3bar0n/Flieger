@@ -26,6 +26,7 @@ def Process(qchild_led,qparent_led):
             #print (sumV)
             if (qchild_led.poll() == True):
                 showstate =  qchild_led.recv()
+                #print("showstate", showstate)
             if (qparent_led.poll() == False):
                 qchild_led.send(taster)
             if (timeold > time.monotonic()):

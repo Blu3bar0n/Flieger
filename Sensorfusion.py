@@ -35,15 +35,19 @@ class SENS():
     tmonCFold = 0.0
     tmonCFoldMag = 0.0
     tmonCFoldAcc = 0.0
+    tmonCFoldBarhoehe =0.0
     gps = GPSDevice.GPSDevice()
     lastValidLat = 0.0
     lastValidLon = 0.0
     lastValidTmon = 0.0
     lastValidtime = u'2018-10-02T14:55:05.000Z'
     dposLastValidOhneFilter = [0.0,0.0,0.0]
-    
+    barHoehe_raw = [0.0, 0]
+    barHoehe_rawOld = 0.0
+    nurBarHoehe = 0.0
+    hoeheBarFilter = 0.0
     dataToSend = [[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]] #gyr,acc,mag,accOhneG,istgyr,vVehicle,vWorld,pos,gps
-
+    dataToSendReg= [[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]] #gyr,acc,accOhneG,istgyr,vVehicle,vWorld,pos
     
     def ShiftInRange(self,wert,unten,oben):
         if(wert < unten):
@@ -148,8 +152,34 @@ class SENS():
         #print ("istgyr[2], gyr[2]: ",self.istgyr[2],self.gyrWorld[2])
         #print(self.istgyr)
     
-
-def Process(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps):
+    def Barhoehe(self):
+        deltaH = self.barHoehe_raw[0]-self.barHoehe_rawOld
+        self.nurBarHoehe = self.nurBarHoehe + deltaH
+        #print("self.nurBarHoehe", self.nurBarHoehe)
+        self.barHoehe_rawOld = self.barHoehe_raw[0]
+    
+    def BarhoeheFilter(self):
+        tmon = round(time.monotonic(), 2) #alle 0,01 s
+        if(tmon-self.tmonCFoldBarhoehe > 0.091): #alle 0,1s
+            self.pos[2] = self.pos[2] * 0.9 + self.nurBarHoehe * 0.1
+            dHdt = (self.nurBarHoehe-self.hoeheBarFilter) / (tmon-self.tmonCFoldBarhoehe)
+            self.hoeheBarFilter = self.nurBarHoehe
+            self.vWorld[2] = 0.95 * self.vWorld[2] + 0.05* dHdt
+            #print("self.accOhneG[2]", self.accOhneG[2])
+            #print("self.nurBarHoehe", self.nurBarHoehe)
+            #print("dHdt", dHdt)
+            #print("self.vWorld[2]", self.vWorld[2])
+            #print("self.pos[2]", self.pos[2])
+            self.tmonCFoldBarhoehe = tmon
+            
+            
+            #hack für vVehicle
+            winkel = [self.istgyr[0] / 180 * math.pi, self.istgyr[1] / 180 * math.pi, self.istgyr[2] / 180 * math.pi]
+            V = KONST.RMatrixWeltZuFahrzeug(self.vWorld, winkel)
+            for i in range(0, 3):
+                self.vVehicle[i] = 0.95 * self.vVehicle[i] + 0.02 * V[i]
+    
+def Process(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps, qparent_sens_reg,  qchild_sens_reg):
     try:
         print("In Sensorfusion")
         Sens = SENS()
@@ -175,8 +205,26 @@ def Process(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps):
         yagyr = math.atan2(bmi160Data[2][1], bmi160Data[2][0]) * 180 / math.pi #pitch from Acc
         print("yaw mag", yagyr)
         Sens.istgyr[2] = yagyr
-        while(True):
+        Sens.barHoehe_rawOld = bmi160Data[3][0]
+        print("bmi160Data[3][0]sdfgd", bmi160Data[3][0])
+        #init für kopf
+        SCHRITTWEITE = 0.0050
+        tol = SCHRITTWEITE*1.1
+        newRun = time.monotonic()+SCHRITTWEITE
+        #init end kopf
+        while (True):
             try:
+                #kopf für while Timing
+                timetest = newRun - time.monotonic()
+                if(timetest>0 and timetest < tol):
+                    time.sleep(timetest)
+                else:
+                    #print("Sensorfusion timetest<0 oder > Schrerittweite +0.001")
+                    #print(timetest)
+                    newRun =  time.monotonic()+SCHRITTWEITE
+                #print("dauer für den letzten zeitschritt")
+                newRun = newRun+SCHRITTWEITE#Hz Timing
+                #ende kopf
                 #///////////////////////////////Get Data///////////////////
                 if (q_gps.empty() == False):
                     Sens.gps = q_gps.get()
@@ -188,9 +236,9 @@ def Process(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps):
                         for i in range(0, 3):
                             Sens.dposLastValidOhneFilter[i] = 0.0
                 if (qparent_bmi.poll() == True):
-                   bmi160Data =  qparent_bmi.recv()
-                   #print("data in sens",bmi160Data[0][4] )
-                   for i in range(0, 5):
+                    bmi160Data =  qparent_bmi.recv()
+                    #print("data in sens",bmi160Data[0][4] )
+                    for i in range(0, 5):
                         if(bmi160Data[0][4]):
                            Sens.gyr_raw[i] = bmi160Data[0][i]
                            #print(Sens.gyr_raw[i])
@@ -198,6 +246,10 @@ def Process(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps):
                             Sens.acc_raw[i] = bmi160Data[1][i]
                         if(bmi160Data[2][4]):
                             Sens.mag_raw[i] = bmi160Data[2][i]
+                    if(bmi160Data[3][1]):
+                        Sens.barHoehe_raw[0] = bmi160Data[3][0]
+                        Sens.barHoehe_raw[1] = bmi160Data[3][1]
+                    
                 #/////////////////////////Process Data////////////////////
                 if(Sens.gyr_raw[4] == 1):
                     Sens.CalcEuler()
@@ -205,10 +257,15 @@ def Process(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps):
                 if(Sens.acc_raw[4] == 1):
                     Sens.Positionsbestimmung()
                     Sens.acc_raw[4] = 0
+                if(Sens.barHoehe_raw[1]):
+                    Sens.Barhoehe()
+                    Sens.barHoehe_raw[1] = 0
                 #///////////////////Filter Data//////////////////
                 Sens.ComplementaryFilter()
                 Sens.ComplementaryFilterAcc()
+                Sens.BarhoeheFilter() #enthält auch hack für vVehicle
                 #////////////////////Send Data
+                #daten für main
                 if (qparent_sens.poll() == False):
                     for i in range(0, 3):
                         Sens.dataToSend[0][i]  = Sens.gyr_raw[i] #[gyr,acc,mag,accOhneG,istgyr,vVehicle,vWorld,pos,gps ]
@@ -223,6 +280,18 @@ def Process(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps):
                     Sens.dataToSend[8][1]  = Sens.gps.lon
                     #print("istgyr:",  Sens.istgyr)  
                     qchild_sens.send(Sens.dataToSend)
+                #daten für regelung
+                if (qparent_sens_reg.poll() == False):
+                    for i in range(0, 3):
+                        Sens.dataToSendReg[0][i]  = Sens.gyr_raw[i] #[gyr,acc,mag,accOhneG,istgyr,vVehicle,vWorld,pos,gps ]
+                        Sens.dataToSendReg[1][i]  = Sens.accOhneG[i]
+                        Sens.dataToSendReg[2][i]  = Sens.istgyr[i]
+                        Sens.dataToSendReg[3][i]  = Sens.vVehicle[i]
+                        Sens.dataToSendReg[4][i]  = Sens.vWorld[i]
+                        Sens.dataToSendReg[5][i]  = Sens.pos[i]
+                    #print("istgyr:",  Sens.istgyr)  
+                    qchild_sens_reg.send(Sens.dataToSendReg)
+                
             except KeyboardInterrupt: 
                 exit()
             except Exception as e:

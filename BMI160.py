@@ -1,6 +1,7 @@
 import time
 import smbus2
 import KONST
+import BME280
 
 class BMI160():
 
@@ -100,6 +101,7 @@ class BMI160():
     sensortimeOldAcc = 0
     sensortimeOldGyr = 0
     bus = smbus2.SMBus(5)
+    bme280 = BME280.BME280(bus)
     kallibx = 0.0
     kalliby = 0.0
     kallibz = 0.0
@@ -107,9 +109,13 @@ class BMI160():
     akalliby = 0.0
     akallibz = 0.0
     tmonCFold = 0.0
+    #temperatur = 0.0
+    barhoehe = 0.0
+    druck = 0.0
     #minAcc = 0.05
+    tmonCFoldBME = 0.0
 
-    dataToSend = [[0.0,0.0,0.0, 0.0, 0], [0.0,0.0,0.0, 0.0, 0], [0.0,0.0,0.0, 0.0, 0]] # gyr, acc, mag, [x,y,z,dTime,isNewData]
+    dataToSend = [[0.0,0.0,0.0, 0.0, 0], [0.0,0.0,0.0, 0.0, 0], [0.0,0.0,0.0, 0.0, 0], [0.0, 0]] # gyr, acc, mag, [x,y,z,dTime,isNewData], [alt über null,isNewData]
 
     def Kallib(self):
         print ("kalib gestartet")
@@ -342,8 +348,8 @@ class BMI160():
                 rhall = (mag_raw[6]>>2) + (mag_raw[7]<<6)
                 #print(lmag, rhall)
                 self.mag[2] = - self.Compensate_x(lmag[0], rhall) - self.magKallib[0]
-                self.mag[1] = - self.Compensate_x(lmag[1], rhall) - self.magKallib[1]
-                self.mag[0] = - self.Compensate_x(lmag[2], rhall) - self.magKallib[2]
+                self.mag[1] = - self.Compensate_y(lmag[1], rhall) - self.magKallib[1] #///////////////richtig kompensiert?
+                self.mag[0] = - self.Compensate_z(lmag[2], rhall) - self.magKallib[2]
                 #print("compensiert", self.mag)
                 self.dataToSend[2][4] = 1
                 for i in range(0, 3):
@@ -500,12 +506,12 @@ class BMI160():
             sumlinks[i] = sumlinks[i] / count
             print(sumlinks[i], count)
         qchild_bmi.send(4)
+        print("bmm Links Done")
         for i in range(0, 3):
             self.magKallib[i] = (sumvorne[i] + sumrechts[i] + sumhinten[i] + sumlinks[i]) / 4
-        print("bmm Links Done")
 
         kallibtxt = open(KONST.MAGKALLIBFILENAME,"w")
-        print(self.magKallib)
+        print("self.magKallib", self.magKallib)
         print(sumvorne)
         print(sumrechts)
         print(sumhinten)
@@ -513,6 +519,21 @@ class BMI160():
         msg = str(self.magKallib[0]) + '\n' + str(self.magKallib[1]) + '\n' + str(self.magKallib[2]) + '\n'
         kallibtxt.write(msg)
         kallibtxt.close()
+    
+    def get_altitude(self, pressure, seaLevel):
+        atmospheric = pressure / 100.0
+        return 44330.0 * (1.0 - pow(atmospheric/seaLevel, 0.1903))
+    
+    def ReadOnceBME280(self):
+        tmon = round(time.monotonic(), 2) #alle 0,01 s
+        if(tmon-self.tmonCFoldBME != 0.0): 
+            self.tmonCFoldBME = tmon
+            #self.temperatur = self.bme280.read_temperature()
+            self.druck = self.bme280.read_pressure()
+            self.barhoehe = self. get_altitude(self.druck, 1024.25)
+            self.dataToSend[3][0] = self.barhoehe
+            self.dataToSend[3][1] = 1
+            #print("self.barhoehe", self.barhoehe)
 
 def Process(qchild_bmi, qparent_bmi):
     print ("in Prozess BMI")
@@ -549,13 +570,15 @@ def Process(qchild_bmi, qparent_bmi):
             #print("asdfnkjasdjkndkjf")
             bmi160.ReadOnce()
             bmi160.ReadOnceMag()
-            if(bmi160.dataToSend[0][4] == 1 or bmi160.dataToSend[1][4] == 1 or bmi160.dataToSend[2][4] == 1):
+            bmi160.ReadOnceBME280()
+            if(bmi160.dataToSend[0][4] == 1 or bmi160.dataToSend[1][4] == 1 or bmi160.dataToSend[2][4] == 1 or bmi160.dataToSend[3][1] == 1):
                 if (qparent_bmi.poll() == False):
                     qchild_bmi.send(bmi160.dataToSend)
                     #print("bmi send")
                     for i in range(0, 3):
                         bmi160.dataToSend[i][4] = 0
                         #print(i, bmi160.dataToSend[1][i])
+                    bmi160.dataToSend[3][1] = 0
     except KeyboardInterrupt: 
         exit()
     except:

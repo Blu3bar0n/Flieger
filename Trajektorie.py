@@ -44,7 +44,7 @@ class TRAJEKTORIE():
         return wert    
         
     def StupidControl(self, istPos, istGyr):
-        print("StupidControll")
+        #print("StupidControll")
         if(self.nextWaypoint[4]==0):
             istGyr[0] = 0.0
             istGyr[1] = 0.0 
