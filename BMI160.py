@@ -347,9 +347,25 @@ class BMI160():
                     lmag[2] = lmag[2] + self.BMM150_ZAXIS_HALL_OVERFLOW_ADCVAL
                 rhall = (mag_raw[6]>>2) + (mag_raw[7]<<6)
                 #print(lmag, rhall)
-                self.mag[2] = - self.Compensate_x(lmag[0], rhall) - self.magKallib[0]
-                self.mag[1] = - self.Compensate_y(lmag[1], rhall) - self.magKallib[1] #///////////////richtig kompensiert?
-                self.mag[0] = - self.Compensate_z(lmag[2], rhall) - self.magKallib[2]
+                self.mag[2] = - self.Compensate_x(lmag[0], rhall)# - self.magKallib[0]
+                self.mag[1] = - self.Compensate_y(lmag[1], rhall)# - self.magKallib[1] #///////////////richtig kompensiert?
+                self.mag[0] = - self.Compensate_z(lmag[2], rhall)# - self.magKallib[2]
+                if(1): #1für std; 0 für callib aufnahmen
+                    self.mag_n = self.mag
+                    self.mag_n[0] = self.mag_n[0] -(-47.917428)
+                    self.mag_n[1] = self.mag_n[1] -(-7.663622)
+                    self.mag_n[2] = self.mag_n[2] -(-8.084754)
+                    
+                    self.mag[0] = self.mag_n[0] * (0.025890) + self.mag_n[1] * (0.000093) + self.mag_n[2] * (-0.000143)
+                    self.mag[1] = self.mag_n[0] * (0.000093) + self.mag_n[1] * (0.026357) + self.mag_n[2] * (-0.000660)
+                    self.mag[2] = self.mag_n[0] * (-0.000143) + self.mag_n[1] * (-0.000660) + self.mag_n[2] * (0.030451)
+                else:
+                    log = open("/home/odroid/Desktop/ericWorkspace/Python/LOG/LogMagForCallib","a") #log Für magneto tool
+                    logstr = str(self.mag[0]) + "\t" + str(self.mag[1]) + "\t" + str(self.mag[2]) +"\n"
+                    print(logstr)
+                    log.write(logstr)
+                    log.close()
+
                 #print("compensiert", self.mag)
                 self.dataToSend[2][4] = 1
                 for i in range(0, 3):
