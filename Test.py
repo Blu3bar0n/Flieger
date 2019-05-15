@@ -3,7 +3,7 @@ import GPSDevice
 import BMI160
 #import sys
 import time
-#import os
+import os
 import multiprocessing as mp
 import LED
 import KONST
@@ -14,16 +14,22 @@ import Regelung
 import Trajektorie
 import math
 
-eth = open("/sys/class/net/eth0/operstate","r")
-streth = eth.read(2)
-eth.close()
-print (streth)
+try:
+    eth = open("/sys/class/net/eth0/operstate","r")
+    streth = eth.read(2)
+    print (streth)
+    eth.close()
+except FileNotFoundError:
+    print("not Found: /sys/class/net/eth0/operstate")
 if(streth == "up"):
     KONST.ethconn = True
 else:
-    eth = open("/sys/class/net/wlan0/operstate","r")
-    streth = eth.read(2)
-    eth.close()
+    try:
+        eth = open("/sys/class/net/wlan0/operstate","r")
+        streth = eth.read(2)
+        eth.close()
+    except FileNotFoundError:
+        print("not Found: /sys/class/net/wlan0/operstate")
     print (streth)
     if(streth == "up"):
         KONST.ethconn = True
@@ -36,6 +42,7 @@ lastValidLat = 48.807
 lastValidLon = 9.262
 lastValidCours = 0.0
 lastValidSpeed = 0.0
+n_Wp = [0.0, 0.0, 0.0, 0.0, 0.0]
 
 print("start")
 
@@ -81,6 +88,7 @@ if(tmonCFoldH5 > 2000000.0):
 
 #print(type(maxAbsGyr[1]), dsetH5cuw.dtype)
 logstr = ""
+oldLogstr = ""
 # init log ende
 
 dataForRegleung = [[0.0], [0.0, 0.0,0.0,-1.0,0.0,0.0,-1.0],[0.0,0.0,0.0], [0.0] ] #[state, channels, Trajektorie, zusatzservo ]
@@ -174,6 +182,8 @@ if __name__ == '__main__':
         else:
             if (qchild_reg.poll() == False):
                 qparent_led.send(KONST.kallib)
+        if (qparent_sens.poll() == True):
+            qparent_sens.recv()
         time.sleep(0.05)
     channel = KONST.CHDEF
     for i in range (1, 7):
@@ -181,76 +191,76 @@ if __name__ == '__main__':
     qparent_reg.send(dataForRegleung)
     #/////////////////////////MAG Kallib ///////////////////////////
     print("MAG Kallib")
-    tasterReleased = 0
-    gpsUp = 0
-    while(taster[0] != KONST.TL or tasterReleased == 0 or kallibstate != 0 ):#or gpsUp == 0):
-        if (qparent_led.poll() == True):
-            taster =  qparent_led.recv()
-        if (taster[0] == KONST.KT):
-            tasterReleased = 1
-        if (qparent_sens.poll() == True):
-            gpsUp = qparent_sens.recv()
-        if (qchild_led.poll() == False):
-            if(gpsUp == 0):
-                qparent_led.send(KONST.magkallib)
-            else:
-                qparent_led.send(KONST.magkallibwpos)
-        if(tasterReleased == 1 and taster[0] == KONST.TRL):#Start MAG Kallib und Vorne
-            print("Start MAG KAllib => VORNE")
-            qparent_bmi.send(1)
-            qparent_led.send(KONST.kallib)
-            time.sleep(1)
-            while( qparent_bmi.poll() == False):
-                time.sleep(0.01)
-            qparent_led.send(KONST.magkallib2)
-            kallibstate =  qparent_bmi.recv()
-            print("MAG KAllib => RECHTS")
-            while(taster[0] != KONST.KT):
-                if (qparent_led.poll() == True):
-                    taster =  qparent_led.recv()
-            while(taster[0] != KONST.TR):#Rechts
-                if (qparent_led.poll() == True):
-                    taster =  qparent_led.recv()
-            qparent_bmi.send(2)
-            qparent_led.send(KONST.kallib)
-            time.sleep(1)
-            while( qparent_bmi.poll() == False):
-                time.sleep(0.01)
-            qparent_led.send(KONST.magkallib3)
-            kallibstate =  qparent_bmi.recv()
-            print("MAG KAllib => HINTEN")
-            while(taster[0] != KONST.KT):
-                if (qparent_led.poll() == True):
-                    taster =  qparent_led.recv()
-            while(taster[0] != KONST.TR): #Hinten
-                if (qparent_led.poll() == True):
-                    taster =  qparent_led.recv()
-            qparent_bmi.send(3)
-            qparent_led.send(KONST.kallib)
-            time.sleep(1)
-            while( qparent_bmi.poll() == False):
-                time.sleep(0.01)
-            qparent_led.send(KONST.magkallib4)
-            kallibstate =  qparent_bmi.recv()
-            print("MAG KAllib => LINKS")
-            while(taster[0] != KONST.KT):
-                if (qparent_led.poll() == True):
-                    taster =  qparent_led.recv()
-            while(taster[0] != KONST.TR): #Links
-                if (qparent_led.poll() == True):
-                    taster =  qparent_led.recv()
-            qparent_bmi.send(4)
-            qparent_led.send(KONST.kallib)
-            time.sleep(1)
-            while( qparent_bmi.poll() == False):
-                time.sleep(0.01)
-            qparent_led.send(KONST.magkallib)
-            kallibstate =  qparent_bmi.recv()
-            if(kallibstate != 4):
-                print("ERROR ind der Kallib")
-            else:
-                kallibstate = 0
-            print("MAG KAllib ENDE")
+#    tasterReleased = 0
+#    gpsUp = 0
+#    while(taster[0] != KONST.TL or tasterReleased == 0 or kallibstate != 0 ):#or gpsUp == 0):
+#        if (qparent_led.poll() == True):
+#            taster =  qparent_led.recv()
+#        if (taster[0] == KONST.KT):
+#            tasterReleased = 1
+#        if (qparent_sens.poll() == True):
+#            gpsUp = qparent_sens.recv()
+#        if (qchild_led.poll() == False):
+#            if(gpsUp == 0):
+#                qparent_led.send(KONST.magkallib)
+#            else:
+#                qparent_led.send(KONST.magkallibwpos)
+#        if(tasterReleased == 1 and taster[0] == KONST.TRL):#Start MAG Kallib und Vorne
+#            print("Start MAG KAllib => VORNE")
+#            qparent_bmi.send(1)
+#            qparent_led.send(KONST.kallib)
+#            time.sleep(1)
+#            while( qparent_bmi.poll() == False):
+#                time.sleep(0.01)
+#            qparent_led.send(KONST.magkallib2)
+#            kallibstate =  qparent_bmi.recv()
+#            print("MAG KAllib => RECHTS")
+#            while(taster[0] != KONST.KT):
+#                if (qparent_led.poll() == True):
+#                    taster =  qparent_led.recv()
+#            while(taster[0] != KONST.TR):#Rechts
+#                if (qparent_led.poll() == True):
+#                    taster =  qparent_led.recv()
+#            qparent_bmi.send(2)
+#            qparent_led.send(KONST.kallib)
+#            time.sleep(1)
+#            while( qparent_bmi.poll() == False):
+#                time.sleep(0.01)
+#            qparent_led.send(KONST.magkallib3)
+#            kallibstate =  qparent_bmi.recv()
+#            print("MAG KAllib => HINTEN")
+#            while(taster[0] != KONST.KT):
+#                if (qparent_led.poll() == True):
+#                    taster =  qparent_led.recv()
+#            while(taster[0] != KONST.TR): #Hinten
+#                if (qparent_led.poll() == True):
+#                    taster =  qparent_led.recv()
+#            qparent_bmi.send(3)
+#            qparent_led.send(KONST.kallib)
+#            time.sleep(1)
+#            while( qparent_bmi.poll() == False):
+#                time.sleep(0.01)
+#            qparent_led.send(KONST.magkallib4)
+#            kallibstate =  qparent_bmi.recv()
+#            print("MAG KAllib => LINKS")
+#            while(taster[0] != KONST.KT):
+#                if (qparent_led.poll() == True):
+#                    taster =  qparent_led.recv()
+#            while(taster[0] != KONST.TR): #Links
+#                if (qparent_led.poll() == True):
+#                    taster =  qparent_led.recv()
+#            qparent_bmi.send(4)
+#            qparent_led.send(KONST.kallib)
+#            time.sleep(1)
+#            while( qparent_bmi.poll() == False):
+#                time.sleep(0.01)
+#            qparent_led.send(KONST.magkallib)
+#            kallibstate =  qparent_bmi.recv()
+#            if(kallibstate != 4):
+#                print("ERROR ind der Kallib")
+#            else:
+#                kallibstate = 0
+#            print("MAG KAllib ENDE")
     #////////ENDE KALLIBS ///////////////////////////////////////////////
     qparent_bmi.send(0)
     qparent_bmi.send(0)
@@ -300,6 +310,9 @@ if __name__ == '__main__':
                     #print(qparent_sens.recv())
                     recvData =  qparent_sens.recv()
                     for i in range(0, 3):
+                        #print("i", i)
+                        #print("type(sens.gyr_raw[i])", type(sens.gyr_raw[i]))
+                        #print("type(recvData[0][i])", type(recvData[0][i]))
                         sens.gyr_raw[i]  = recvData[0][i] #[gyr,acc,mag,accOhneG,istgyr,vVehicle,vWorld,pos,gps ]
                         sens.acc_raw[i]  = recvData[1][i]
                         sens.mag_raw[i]  = recvData[2][i]
@@ -345,7 +358,6 @@ if __name__ == '__main__':
                         logstr = logstr + "Flugsteuerung: autonom"+'\n'
                         switchOld = 1
                         trajek.SetOldWaypoint(sens.pos)
-                        n_Wp = [0.0, 0.0, 0.0, 0.0, 0.0]
                         n_Wp[0] = sens.pos[0] + math.cos(sens.istgyr[2] / 180 * math.pi) *  0.004 #440m
                         n_Wp[1] = sens.pos[1] + math.sin(sens.istgyr[2] / 180 * math.pi) *  0.004 #440m
                         n_Wp[2] = sens.pos[2]
@@ -378,6 +390,7 @@ if __name__ == '__main__':
 #                    if (channel[7] == -1 and channel[8] == -1 and channel[9] == -1):
 #                        VRBOld = channel[6]
                     dataForRegleung[2] = trajek.StupidControl(sens.pos, sens.istgyr)
+                    
                     if(qchild_reg.poll() == False):
                         dataForRegleung[0][0] = 2
                         for i in range (1, 7):
@@ -404,23 +417,38 @@ if __name__ == '__main__':
                         logstr = logstr + "         Lon: "+str(sens.gps.lon)+" posy: "+str(sens.pos[1])+'\n'
                         logstr = logstr + "         Speed: "+str(sens.gps.speed)+'\n'
                         logstr = logstr + "         Alt: "+str(sens.gps.alt)+" posz: "+str(sens.pos[2])+'\n'
-                        print(logstr)
+                        #print(logstr)
                         log = open(FILENAME,"a")
                         log.write(logstr)
                         log.close()
+                        oldLogstr = logstr
                         logstr = ""
                         geschrieben = True
-                        eth = open("/sys/class/net/eth0/operstate","r")
-                        streth = eth.read(2)
-                        eth.close()
+                        try:
+                            eth = open("/sys/class/net/eth0/operstate","r")
+                            streth = eth.read(2)
+                            #print (streth)
+                            eth.close()
+                        except FileNotFoundError:
+                            print("not Found: /sys/class/net/eth0/operstate")
                         if(streth == "up"):
                             KONST.ethconn = True
                         else:
-                            KONST.ethconn = False
+                            try:
+                                eth = open("/sys/class/net/wlan0/operstate","r")
+                                streth = eth.read(2)
+                                eth.close()
+                            except FileNotFoundError:
+                                print("not Found: /sys/class/net/wlan0/operstate")
+                            #print (streth)
+                            if(streth == "up"):
+                                KONST.ethconn = True
+                            else:
+                                KONST.ethconn = False
                 else:
                     geschrieben = False
                 tmonH5 = round(time.monotonic(), 2) #100Hz
-                if(tmonH5-tmonCFoldH5 > 0.09):#10Hz
+                if(tmonH5-tmonCFoldH5 > 0.19):#5Hz
                     tmonCFoldH5 = tmonH5
                     if (countH5cuw<maxH5countH5cuw):
                         dsetH5cuw[countH5cuw, 0] = chSend[1]
@@ -447,7 +475,28 @@ if __name__ == '__main__':
                         #print("x", sens.accogWorld[0]*100)
                         #print("y", sens.accogWorld[1]*100)
                         countH5cuw = countH5cuw + 1
-                #//////////////////////////////log//////////////////////////////
+                    #"gui"
+                    akkuSpannung = (taster[1] - 1575) / 165 * 100
+                    akkuSpannung = round(akkuSpannung, 2)
+                    if(1):
+                        os.system('clear')
+                        print(oldLogstr)
+                        print("FSiA10B status:", channel[0], " Modus: ",  channel[10])
+                        print("Roll, Pitch, Yaw: ", round(sens.istgyr[0], 2), round(sens.istgyr[1], 2), round(sens.istgyr[2], 2)) 
+                        print("akkuSpannung %: ", akkuSpannung)
+                        print("KONST.ethconn: ",  KONST.ethconn)
+                        print("dataForRegleung[2]: ", dataForRegleung[2])
+                        #print("(n_Wp): ", (n_Wp))
+                    if(akkuSpannung <= 0.0):
+                        if(akkuSpannung < -500):
+                            print("Akku nicht angeschlossen, akkuSpannung: ",  akkuSpannung)
+                        else:
+                            print("!!!!!!!!!!! akkuSpannung zu tief !!!!!!!!!!!!!: ",  akkuSpannung)
+                            print("!!!!!!!!!!! akkuSpannung zu tief !!!!!!!!!!!!!: ",  akkuSpannung)
+                            print("!!!!!!!!!!! akkuSpannung zu tief !!!!!!!!!!!!!: ",  akkuSpannung)
+                            print("!!!!!!!!!!! akkuSpannung zu tief !!!!!!!!!!!!!: ",  akkuSpannung)
+                            print("!!!!!!!!!!! akkuSpannung zu tief !!!!!!!!!!!!!: ",  akkuSpannung)
+                #//////////////////////////////log/////////////////////////////
                 #print(time.monotonic()-timeOld)
                 #timeOld = time.monotonic()
                 if(taster[0] == KONST.BTL):

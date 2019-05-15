@@ -352,13 +352,13 @@ class BMI160():
                 self.mag[0] = - self.Compensate_z(lmag[2], rhall)# - self.magKallib[2]
                 if(1): #1für std; 0 für callib aufnahmen
                     self.mag_n = self.mag
-                    self.mag_n[0] = self.mag_n[0] -(-47.917428)
-                    self.mag_n[1] = self.mag_n[1] -(-7.663622)
-                    self.mag_n[2] = self.mag_n[2] -(-8.084754)
+                    self.mag_n[0] = self.mag_n[0] -(-36.751599)
+                    self.mag_n[1] = self.mag_n[1] -(2.567309)
+                    self.mag_n[2] = self.mag_n[2] -(-16.930631)
                     
-                    self.mag[0] = self.mag_n[0] * (0.025890) + self.mag_n[1] * (0.000093) + self.mag_n[2] * (-0.000143)
-                    self.mag[1] = self.mag_n[0] * (0.000093) + self.mag_n[1] * (0.026357) + self.mag_n[2] * (-0.000660)
-                    self.mag[2] = self.mag_n[0] * (-0.000143) + self.mag_n[1] * (-0.000660) + self.mag_n[2] * (0.030451)
+                    self.mag[0] = self.mag_n[0] * (0.025025) + self.mag_n[1] * (-0.000275) + self.mag_n[2] * (-0.000179)
+                    self.mag[1] = self.mag_n[0] * (-0.000275) + self.mag_n[1] * (0.026307) + self.mag_n[2] * (0.000610)
+                    self.mag[2] = self.mag_n[0] * (-0.000179) + self.mag_n[1] * (0.000610) + self.mag_n[2] * (0.028161)
                 else:
                     log = open("/home/odroid/Desktop/ericWorkspace/Python/LOG/LogMagForCallib","a") #log Für magneto tool
                     logstr = str(self.mag[0]) + "\t" + str(self.mag[1]) + "\t" + str(self.mag[2]) +"\n"

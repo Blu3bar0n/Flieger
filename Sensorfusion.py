@@ -107,9 +107,9 @@ class SENS():
             if(abs(self.istgyr[2] - yagyr)<180):
                 self.istgyr[2] = self.istgyr[2] * 0.95 + yagyr * 0.05
             else:
-                self.istgyr[2] = self.ShiftInRange(self.istgyr[2],0,360)
+                tmp_istgyr2 = self.ShiftInRange(self.istgyr[2],0,360)
                 yagyr = self.ShiftInRange(yagyr,0,360)
-                self.istgyr[2] = self.istgyr[2] * 0.95 + yagyr * 0.05
+                self.istgyr[2] = tmp_istgyr2 * 0.95 + yagyr * 0.05
                 self.istgyr[2] = self.ShiftInRange(self.istgyr[2],-180,180)
             
     def ComplementaryFilterAcc(self):

@@ -54,6 +54,7 @@ class REGELUNG():
     servo.setOffset(5,servoCh5off)
     servo.setRange(5,1000+servoCh5off,2000+servoCh5off)
     zusatzservo = 0.0
+    tmonErrOld = 0.0
     print("servo gestartet")
     
     
@@ -87,7 +88,7 @@ class REGELUNG():
         abweichung = sollRoll - istRoll
         abweichung = self.ShiftInRange(abweichung,-180,180)
         abweichung = abweichung/180
-        #print "abweichung", abweichung
+        #print ("abweichung", abweichung)
         self.pidRoll.update(abweichung)
         steuerung = self.MaxAbsWert(self.pidRoll.output,-1,1)
         if(abweichung < 0):
@@ -168,10 +169,13 @@ class REGELUNG():
                 self.servo.setTarget(i,self.channel[i])
                 self.oldChSend[i] = self.channel[i]
                 count = count + 1
-                #print("fbadhfbajkbfkjagssffiasgizgfija" , self.channel[i])
-        #print("Check error")
+        #print("self.channel[1]" , self.channel[1])
         if(count > 0):
-            self.servo.getErrors()
+            tmonErr = round(time.monotonic(), 2) #100Hz
+            if(tmonErr-self.tmonErrOld > 0):
+                self.tmonErrOld = tmonErr
+            #print("check error" )
+                self.servo.getErrors()
 
 
 def Process(qparent_reg,  qchild_reg, qparent_sens_reg,  qchild_sens_reg):
@@ -208,8 +212,9 @@ def Process(qparent_reg,  qchild_reg, qparent_sens_reg,  qchild_sens_reg):
                         reg.trajektorie[i]  = dataFromRegleung[2][i] 
                     reg.zusatzservo = dataFromRegleung[3][0] 
                 #data from sens
-                if (qchild_sens_reg.poll() == True):
-                    dataFromRegleung = qchild_sens_reg.recv() #[gyr,accOhneG,istgyr,vVehicle,vWorld, pos ]
+                if (qparent_sens_reg.poll() == True):
+                    #print("Data von regelung")
+                    dataFromRegleung = qparent_sens_reg.recv() #[gyr,accOhneG,istgyr,vVehicle,vWorld, pos ]
                     for i in range(0, 3):
                         reg.gyr[i]  = dataFromRegleung[0][i]              
                         reg.accOhneG[i] = dataFromRegleung[1][i]

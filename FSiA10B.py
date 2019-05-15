@@ -80,7 +80,6 @@ class FSiA10B():
                         #print("FSiA10B channel[10]", self.channel[10])
                     else:
                         print("buffer flushed",  lenght)
-
                         self.ser.reset_input_buffer()
                 elif(lenght > 0):
                     if(0):

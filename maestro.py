@@ -31,6 +31,7 @@ class Controller:
     def __init__(self,ttyStr='/dev/serial/by-id/usb-Pololu_Corporation_Pololu_Mini_Maestro_12-Channel_USB_Servo_Controller_00211345-if00',device=0x0c): #std: /dev/ttyACM0
         # Open the command port
         self.usb = serial.Serial(ttyStr) #serial.Serial('/dev/ttySAC2', 115200, serial.EIGHTBITS, serial.PARITY_NONE,serial.STOPBITS_ONE)
+        self.usb.timeout = 0.0
         # Command lead-in and device number are sent for each Pololu serial command.
         self.PololuCmd = chr(0xaa) + chr(device)
         # Track target position for each servo. The function isMoving() will
@@ -190,10 +191,11 @@ class Controller:
         self.sendCmd(cmd)
         length = self.usb.in_waiting
         if(length > 0):
-            #print("errorlength", length)
-            if(length ==2):
-                error = self.usb.read(length)
-                #if (error != b'\x00\x00'):
-                print("error:", error)
-            else:
-                self.usb.reset_input_buffer()
+            print("errorlength", length)
+#            if(length ==2):
+#                error = self.usb.read(length)
+#                #if (error != b'\x00\x00'):
+#                print("error:", error)
+#            else:
+#                self.usb.reset_input_buffer()
+            self.usb.reset_input_buffer()

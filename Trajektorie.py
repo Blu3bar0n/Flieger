@@ -10,30 +10,31 @@ class TRAJEKTORIE():
     
     def NextWaypointManMode(self, istPos):
         print("NextWaypoint")
-        dWp = [0.0, 0.0, 0.0]
-        dWp[0] = (distance.distance([self.nextWaypoint[0], self.oldWaypoint[1]],[self.oldWaypoint[0], self.oldWaypoint[1]]).km) * 1000
-        dWp[1] = (distance.distance([self.oldWaypoint[0], self.nextWaypoint[1]],[self.oldWaypoint[0], self.oldWaypoint[1]]).km) * 1000
-        if((self.nextWaypoint[0] - self.oldWaypoint[0],)<0):
-            dWp[0] = -dWp[0]
-        if((self.nextWaypoint[1] - self.oldWaypoint[1])<0):
-            dWp[1] = -dWp[1]
-        dposWp = [0.0, 0.0, 0.0]
-        dposWp[0] = (distance.distance([istPos[0], self.oldWaypoint[1]],[self.oldWaypoint[0], self.oldWaypoint[1]]).km) * 1000
-        dposWp[1] = (distance.distance([self.oldWaypoint[0], istPos[1]],[self.oldWaypoint[0], self.oldWaypoint[1]]).km) * 1000
-        if((istPos[0] - self.oldWaypoint[0],)<0):
-            dposWp[0] = -dposWp[0]
-        if((istPos[1] - self.oldWaypoint[1])<0):
-            dposWp[1] = -dposWp[1]
-        n_Wp = [0.0, 0.0, 0.0]
-        faktor = ((dposWp[0] - istPos[0]) * dWp[0]+ (dposWp[1] - istPos[1]) * dWp[1])/(dWp[0] * dWp[0] + dWp[1] * dWp[1])
-        n_Wp[0] = istPos[0] + faktor * dWp[0]
+        dWp = [0.0, 0.0, 0.0] #vektor welcher von oldWaypoint auf nextWaypoint zeigt in [lat, lon, m über ground] 
+        dWp[0] = self.nextWaypoint[0] - self.oldWaypoint[0]#(distance.distance([self.nextWaypoint[0], self.oldWaypoint[1]],[self.oldWaypoint[0], self.oldWaypoint[1]]).km) * 1000
+        dWp[1] = self.nextWaypoint[1] - self.oldWaypoint[1]#(distance.distance([self.oldWaypoint[0], self.nextWaypoint[1]],[self.oldWaypoint[0], self.oldWaypoint[1]]).km) * 1000
+#        if((self.nextWaypoint[0] - self.oldWaypoint[0],)<0):
+#            dWp[0] = -dWp[0]
+#        if((self.nextWaypoint[1] - self.oldWaypoint[1])<0):
+#            dWp[1] = -dWp[1]
+        dposWp = [0.0, 0.0, 0.0] #vektor welcher von istPos auf oldWaypoint zeigt in [lat, lon, m über ground] 
+        dposWp[0] = istPos[0] - self.oldWaypoint[0]#(distance.distance([istPos[0], self.oldWaypoint[1]],[self.oldWaypoint[0], self.oldWaypoint[1]]).km) * 1000
+        dposWp[1] = istPos[1] - self.oldWaypoint[1]#(distance.distance([self.oldWaypoint[0], istPos[1]],[self.oldWaypoint[0], self.oldWaypoint[1]]).km) * 1000
+#        if((istPos[0] - self.oldWaypoint[0],)<0):
+#            dposWp[0] = -dposWp[0]
+#        if((istPos[1] - self.oldWaypoint[1])<0):
+#            dposWp[1] = -dposWp[1]
+        n_Wp = [0.0, 0.0, 0.0] #[lat, lon, m über ground] 
+        faktor = ((dposWp[0] - istPos[0]) * dWp[0]+ (dposWp[1] - istPos[1]) * dWp[1])/(dWp[0] * dWp[0] + dWp[1] * dWp[1]) # einheiten lat lon
+        n_Wp[0] = istPos[0] + faktor * dWp[0] #lot zwischen den achsen wieder in [lat, lon, m über ground] 
         n_Wp[1] = istPos[1] + faktor * dWp[1]
+        
         faktor2 = math.sqrt(dWp[0] * dWp[0] + dWp[1] * dWp[1])
         dWp[0] = dWp[0] / faktor2
         dWp[1] = dWp[1] / faktor2
-        n_Wp[0] = n_Wp[0] + 20 * dWp[0]
+        n_Wp[0] = n_Wp[0] + 20 * dWp[0] 
         n_Wp[1] = n_Wp[1] + 20 * dWp[1]
-        n_Wp[2] = self.nextWaypoint[2] - istPos[2]
+        n_Wp[2] = self.nextWaypoint[2]
         return n_Wp
 
     def ShiftInRange(self,wert,unten,oben):
@@ -52,11 +53,11 @@ class TRAJEKTORIE():
         if(self.nextWaypoint[4]==1):
             #///////////////////sollwerte////////////////
             sollPos = self.NextWaypointManMode(istPos)
-            dpos = [0.0, 0.0, 0.0]
+            dpos = [0.0, 0.0, 0.0] # in m
             dpos[0] = (distance.distance([sollPos[0], istPos[1]],[istPos[0], istPos[1]]).km) * 1000
             dpos[1] = (distance.distance([istPos[0], sollPos[1]],[istPos[0], istPos[1]]).km) * 1000
             dpos[2] = sollPos[2] - istPos[2]
-            if((sollPos[0] - istPos[0],)<0):
+            if((sollPos[0] - istPos[0])<0):
                 dpos[0] = -dpos[0]
             if((sollPos[1] - istPos[1])<0):
                 dpos[1] = -dpos[1]
@@ -75,7 +76,7 @@ class TRAJEKTORIE():
                 else:
                     dPitch = -30
             if(abs(istGyr[1]) > 30): #notfall Pitch
-                retdata = [0.0, 0.0, 0.0]
+                retdata = [0.0, 0.0, 0.0] # SollWinkel für Regelung
                 faktor = 1.0/(self.pitchDependingOnRollmax - self.pitchDependingOnRollmin)
                 retdata[1] = - faktor * abs(istGyr[0]) + self.pitchDependingOnRollmax * faktor
                 if(retdata[1] > 1):
