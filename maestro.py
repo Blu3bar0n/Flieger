@@ -191,7 +191,7 @@ class Controller:
         self.sendCmd(cmd)
         length = self.usb.in_waiting
         if(length > 0):
-            print("errorlength", length)
+            #print("errorlength", length)
 #            if(length ==2):
 #                error = self.usb.read(length)
 #                #if (error != b'\x00\x00'):

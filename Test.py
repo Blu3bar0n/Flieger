@@ -13,6 +13,7 @@ import Sensorfusion
 import Regelung
 import Trajektorie
 import math
+from colorama import Fore, Style 
 
 try:
     eth = open("/sys/class/net/eth0/operstate","r")
@@ -323,7 +324,7 @@ if __name__ == '__main__':
                         sens.pos[i]  = recvData[7][i]
                     sens.gps.lat = recvData[8][0]
                     sens.gps.lon  = recvData[8][1]
-                    #print("pos:", sens.pos)
+                    #print("istgyr:", sens.istgyr)
                     #print("Vehicle:", sens.vVehicle)
                     #qparent_sens.send(1)
                 #print(channel[10])
@@ -478,13 +479,27 @@ if __name__ == '__main__':
                     #"gui"
                     akkuSpannung = (taster[1] - 1575) / 165 * 100
                     akkuSpannung = round(akkuSpannung, 2)
-                    if(1):
+                    if(1): # zeige gui wenn 1
                         os.system('clear')
                         print(oldLogstr)
-                        print("FSiA10B status:", channel[0], " Modus: ",  channel[10])
-                        print("Roll, Pitch, Yaw: ", round(sens.istgyr[0], 2), round(sens.istgyr[1], 2), round(sens.istgyr[2], 2)) 
-                        print("akkuSpannung %: ", akkuSpannung)
-                        print("KONST.ethconn: ",  KONST.ethconn)
+                        if(channel[0] == 29.832):
+                            print(Fore.GREEN + "FSiA10B status:", channel[0], " Modus: ",  channel[10])
+                        else: 
+                            print(Fore.RED + "FSiA10B status:", channel[0], " Modus: ",  channel[10])
+                        if(isinstance(sens.gps.lat, float)):
+                            print(Fore.GREEN + "GPS up")
+                        else: 
+                            print(Fore.RED + "GPS down")
+                        print(Style.RESET_ALL+"Roll, Pitch, Yaw: ", round(sens.istgyr[0], 2), round(sens.istgyr[1], 2), round(sens.istgyr[2], 2)) 
+                        if(akkuSpannung > 0):
+                            print(Fore.GREEN + "akkuSpannung %: ", akkuSpannung)
+                        else: 
+                            print(Fore.RED + "akkuSpannung %: ", akkuSpannung)
+                        if(KONST.ethconn):
+                            print(Fore.GREEN + "KONST.ethconn: ",  KONST.ethconn)
+                        else: 
+                            print(Fore.RED + "KONST.ethconn: ",  KONST.ethconn)
+                        print(Style.RESET_ALL)
                         print("dataForRegleung[2]: ", dataForRegleung[2])
                         #print("(n_Wp): ", (n_Wp))
                     if(akkuSpannung <= 0.0):
