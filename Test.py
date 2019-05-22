@@ -324,6 +324,7 @@ if __name__ == '__main__':
                         sens.pos[i]  = recvData[7][i]
                     sens.gps.lat = recvData[8][0]
                     sens.gps.lon  = recvData[8][1]
+                    sens.yagyr = recvData[9][0]
                     #print("istgyr:", sens.istgyr)
                     #print("Vehicle:", sens.vVehicle)
                     #qparent_sens.send(1)
@@ -495,17 +496,18 @@ if __name__ == '__main__':
                             print(Fore.GREEN + "akkuSpannung %: ", akkuSpannung)
                         else: 
                             print(Fore.RED + "akkuSpannung %: ", akkuSpannung)
+                            if(akkuSpannung > -500):
+                                print("Akku nicht angeschlossen, akkuSpannung: ",  akkuSpannung)
                         if(KONST.ethconn):
                             print(Fore.GREEN + "KONST.ethconn: ",  KONST.ethconn)
                         else: 
                             print(Fore.RED + "KONST.ethconn: ",  KONST.ethconn)
                         print(Style.RESET_ALL)
+                        print("sens.yagyr: ",  sens.yagyr)
                         print("dataForRegleung[2]: ", dataForRegleung[2])
                         #print("(n_Wp): ", (n_Wp))
                     if(akkuSpannung <= 0.0):
-                        if(akkuSpannung < -500):
-                            print("Akku nicht angeschlossen, akkuSpannung: ",  akkuSpannung)
-                        else:
+                        if(akkuSpannung > -500):
                             print("!!!!!!!!!!! akkuSpannung zu tief !!!!!!!!!!!!!: ",  akkuSpannung)
                             print("!!!!!!!!!!! akkuSpannung zu tief !!!!!!!!!!!!!: ",  akkuSpannung)
                             print("!!!!!!!!!!! akkuSpannung zu tief !!!!!!!!!!!!!: ",  akkuSpannung)

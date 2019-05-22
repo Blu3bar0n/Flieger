@@ -46,8 +46,9 @@ class SENS():
     barHoehe_rawOld = 0.0
     nurBarHoehe = 0.0
     hoeheBarFilter = 0.0
-    dataToSend = [[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]] #gyr,acc,mag,accOhneG,istgyr,vVehicle,vWorld,pos,gps
+    dataToSend = [[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0], [0.0]] #gyr,acc,mag,accOhneG,istgyr,vVehicle,vWorld,pos,gps,yagyr
     dataToSendReg= [[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]] #gyr,acc,accOhneG,istgyr,vVehicle,vWorld,pos
+    yagyr = 0.0
     
     def ShiftInRange(self,wert,unten,oben):
         if(wert < unten):
@@ -102,14 +103,26 @@ class SENS():
         
         if(tmon-self.tmonCFoldMag > 0.141): #alle 0,15s
             self.tmonCFoldMag = tmon
-            yagyr = math.atan2(self.mag_raw[1], self.mag_raw[0]) * 180 / math.pi #pitch from Acc
-            #print("yaw mag", self.mag_raw, yagyr)
-            if(abs(self.istgyr[2] - yagyr)<180):
-                self.istgyr[2] = self.istgyr[2] * 0.95 + yagyr * 0.05
+            normalenVector = [0, 0, 1] # normalenvektor welcher senkrecht auf der ebene zum boden steht
+            winkel = [self.istgyr[0] / 180 * math.pi, self.istgyr[1] / 180 * math.pi, self.istgyr[2] / 180 * math.pi]
+            normalenVector = KONST.RMatrixWeltZuFahrzeug(normalenVector, winkel)
+            multNV = 1#ist 1 spaart rechenleistung... normalenVector[0] * normalenVector[0] + normalenVector[1] * normalenVector[1] + normalenVector[2] * normalenVector[2]
+            #print("normalenVector: ", normalenVector)
+            faktor = ((self.mag_raw[0]) * normalenVector[0] + self.mag_raw[1] * normalenVector[1] + self.mag_raw[2] * normalenVector[2])/(multNV) #x_0 = 0 wenn kallibriert
+            corrMag_raw = [0.0, 0.0, 0.0]
+            corrMag_raw[0] = self.mag_raw[0] - faktor * normalenVector[0] #lot zwischen den achsen wieder in [lat, lon, m über ground] 
+            corrMag_raw[1] = self.mag_raw[1] - faktor * normalenVector[1]
+            corrMag_raw[2] = self.mag_raw[2] - faktor * normalenVector[2]
+            
+            self.yagyr = math.atan2(corrMag_raw[1], corrMag_raw[0]) * 180 / math.pi #yaw corr von mag
+            #self.yagyr = math.atan2(self.mag_raw[1], self.mag_raw[0]) * 180 / math.pi #yaw von mag
+            #print("yaw mag",self.yagyr)
+            if(abs(self.istgyr[2] - self.yagyr)<180):
+                self.istgyr[2] = self.istgyr[2] * 0.95 + self.yagyr * 0.05
             else:
                 tmp_istgyr2 = self.ShiftInRange(self.istgyr[2],0,360)
-                yagyr = self.ShiftInRange(yagyr,0,360)
-                self.istgyr[2] = tmp_istgyr2 * 0.95 + yagyr * 0.05
+                self.yagyr = self.ShiftInRange(self.yagyr,0,360)
+                self.istgyr[2] = tmp_istgyr2 * 0.95 + self.yagyr * 0.05
                 self.istgyr[2] = self.ShiftInRange(self.istgyr[2],-180,180)
             
     def ComplementaryFilterAcc(self):
@@ -268,7 +281,7 @@ def Process(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps, qparent
                 #daten für main
                 if (qparent_sens.poll() == False):
                     for i in range(0, 3):
-                        Sens.dataToSend[0][i]  = Sens.gyr_raw[i] #[gyr,acc,mag,accOhneG,istgyr,vVehicle,vWorld,pos,gps ]
+                        Sens.dataToSend[0][i]  = Sens.gyr_raw[i] #[gyr,acc,mag,accOhneG,istgyr,vVehicle,vWorld,pos,gps,yagyr ]
                         Sens.dataToSend[1][i]  = Sens.acc_raw[i]
                         Sens.dataToSend[2][i]  = Sens.mag_raw[i]
                         Sens.dataToSend[3][i]  = Sens.accOhneG[i]
@@ -278,6 +291,7 @@ def Process(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps, qparent
                         Sens.dataToSend[7][i]  = Sens.pos[i]
                     Sens.dataToSend[8][0]  = Sens.gps.lat
                     Sens.dataToSend[8][1]  = Sens.gps.lon
+                    Sens.dataToSend[9][0]  = Sens.yagyr
                     #print("istgyr:",  Sens.istgyr)  
                     qchild_sens.send(Sens.dataToSend)
                 #daten für regelung
