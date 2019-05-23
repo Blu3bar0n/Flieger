@@ -34,8 +34,8 @@ class TRAJEKTORIE():
         faktor2 = math.sqrt(dWp[0] * dWp[0] + dWp[1] * dWp[1])
         dWp_norm[0] = dWp[0] / faktor2
         dWp_norm[1] = dWp[1] / faktor2
-        n_Wp[0] = n_Wp[0] + 0.0002 * dWp_norm[0]  #4        0.0001           11.1 m
-        n_Wp[1] = n_Wp[1] + 0.0002 * dWp_norm[1]
+        n_Wp[0] = n_Wp[0] + 0.0004 * dWp_norm[0]  #4        0.0001           11.1 m
+        n_Wp[1] = n_Wp[1] + 0.0004 * dWp_norm[1]
         
         dposN_Wp = [0.0, 0.0, 0.0] #vektor welcher von oldWaypoint auf n_wp  zeigt in [lat, lon, m über ground] 
         dposN_Wp[0] = n_Wp[0] - self.oldWaypoint[0]
@@ -58,7 +58,7 @@ class TRAJEKTORIE():
             wert = wert - abs(oben-unten)
         return wert    
         
-    def StupidControl(self, istPos_n, istGyr_n):
+    def StupidControl(self, istPos_n, istGyr_n, dposStupidControll):
         istPos = [0.0, 0.0, 0.0]
         istGyr = [0.0, 0.0, 0.0]
         for i in range (0, 3):
@@ -73,7 +73,7 @@ class TRAJEKTORIE():
             #///////////////////sollwerte////////////////
             sollPos = self.NextWaypointOnLineBetweenOldAndNewWaypoint(istPos)
             #print("sollPos", sollPos)
-            dpos = [0.0, 0.0, 0.0] # in m
+            dpos = [0.0, 0.0, 0.0]
             dpos[0] = (distance.distance([sollPos[0], istPos[1]],[istPos[0], istPos[1]]).km) * 1000
             dpos[1] = (distance.distance([istPos[0], sollPos[1]],[istPos[0], istPos[1]]).km) * 1000
             dpos[2] = sollPos[2] - istPos[2]
@@ -82,6 +82,8 @@ class TRAJEKTORIE():
             if((sollPos[1] - istPos[1])<0):
                 dpos[1] = -dpos[1]
             #print("dpos", dpos)
+            for i in range(0, 3):
+                dposStupidControll[i] = round( dpos[i], 2)
             Yaw = math.atan2(dpos[1], dpos[0]) * 180 / math.pi
             Yaw = self.ShiftInRange(Yaw, -180, 180)
             distOverGround = math.sqrt(dpos[0] * dpos[0] + dpos[1] * dpos[1])
@@ -92,6 +94,8 @@ class TRAJEKTORIE():
             dPitch = Pitch - istGyr[1]
             dYaw = Yaw - istGyr[2]
             dYaw = self.ShiftInRange(dYaw, -180, 180)
+            dposStupidControll[3] = round( dPitch, 2)
+            dposStupidControll[4] = round( dYaw, 2)
             #print("dP,dY: ", dPitch,  dYaw)
             if(abs(Pitch) > 30):
                 if(Pitch > 0):

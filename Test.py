@@ -60,6 +60,7 @@ maxAbsGyr = [0.0,0.0,0.0]
 maxAbsAcc = [0.0,0.0,0.0]
 geschrieben = False
 kalibdone = False
+dposStupidControll = [0.0, 0.0, 0.0, 0.0, 0.0] # in m
 
 #init log
 switchOld = -1
@@ -391,7 +392,8 @@ if __name__ == '__main__':
 #                        logstr = logstr + "Neuer Kd"+str(kd)+'\n'
 #                    if (channel[7] == -1 and channel[8] == -1 and channel[9] == -1):
 #                        VRBOld = channel[6]
-                    dataForRegleung[2] = trajek.StupidControl(sens.pos, sens.istgyr)
+                    
+                    dataForRegleung[2] = trajek.StupidControl(sens.pos, sens.istgyr, dposStupidControll)
                     
                     if(qchild_reg.poll() == False):
                         dataForRegleung[0][0] = 2
@@ -504,6 +506,8 @@ if __name__ == '__main__':
                             print(Fore.RED + "KONST.ethconn: ",  KONST.ethconn)
                         print(Style.RESET_ALL)
                         print("sens.yagyr: ",  sens.yagyr)
+                        print("dposStupidControll", dposStupidControll[0], "  ",dposStupidControll[1], "  ", dposStupidControll[2] )
+                        print("dposStupidControll dpitch  dyaw", dposStupidControll[3], "  ",dposStupidControll[4])
                         print("dataForRegleung[2]: ", dataForRegleung[2])
                         #print("(n_Wp): ", (n_Wp))
                     if(akkuSpannung <= 0.0):

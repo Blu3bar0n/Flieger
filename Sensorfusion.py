@@ -174,10 +174,10 @@ class SENS():
     def BarhoeheFilter(self):
         tmon = round(time.monotonic(), 2) #alle 0,01 s
         if(tmon-self.tmonCFoldBarhoehe > 0.091): #alle 0,1s
-            self.pos[2] = self.pos[2] * 0.9 + self.nurBarHoehe * 0.1
+            self.pos[2] = self.pos[2] * 0.8 + self.nurBarHoehe * 0.2
             dHdt = (self.nurBarHoehe-self.hoeheBarFilter) / (tmon-self.tmonCFoldBarhoehe)
             self.hoeheBarFilter = self.nurBarHoehe
-            self.vWorld[2] = 0.95 * self.vWorld[2] + 0.05* dHdt
+            self.vWorld[2] = 0.9 * self.vWorld[2] + 0.1* dHdt
             #print("self.accOhneG[2]", self.accOhneG[2])
             #print("self.nurBarHoehe", self.nurBarHoehe)
             #print("dHdt", dHdt)
