@@ -2,6 +2,50 @@ import time
 import smbus2
 import KONST
 import BME280
+import os
+import spidev
+
+spi = spidev.SpiDev()
+bus = 1
+device = 0
+spi.open(bus,  device)
+spi.mode = 0
+spi.max_speed_hz = 7500000
+spi.bits_per_word = 8
+spi.threewire = False
+#spi.cshigh = True
+spi.cshigh = False
+spi.lsbfirst = False
+#print("1", spi.xfer2([0x7F, 0x00]))
+#print("2", spi.xfer2([(0x7F|0x80), 0x00]))
+#print("3", spi.xfer([0x7F, 0x00]))
+print("switch to spi", spi.xfer2([(0x7F|0x80), 0x00]))
+#spi.writebytes(0x00)
+time.sleep(0.1)
+#spi.sendbytes(0x00)
+#print(spi.readbytes(1))
+#print("5", spi.xfer([0x00, 0x00]))
+print("status", spi.xfer2([(0x00|0x80), 0x00]))
+#print("7", spi.xfer2([0x00, 0x00]))
+print("error", spi.xfer2([(0x02|0x80), 0x00]))
+
+spi.close()
+
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 
 class BMI160():
 
@@ -14,6 +58,8 @@ class BMI160():
     ACC_SET_PMU_MODE = 0x11 #Sets acc power mode normal (11)/ low power (12)
     GYR_SET_PMU_MODE = 0x15 #Sets gyro power mode normal (15)/ fast start-up (16) / suspend (17)
     MAG_SET_PMU_MODE = 0x19 #Sets mag power mode suspend (18)/ normal (1A) oder 19?/ low power (1B) oder 1a?
+    INT_LATCH = 0x54 #verrigelungsmodus ?
+    INT_LATCH_DATA = 0b00000000 # deaktiviert
     FOC = 0x03
     ACC_CONF = 0x40
     ACC_RANGE = 0x41
@@ -114,9 +160,37 @@ class BMI160():
     druck = 0.0
     #minAcc = 0.05
     tmonCFoldBME = 0.0
-
+    
+    spi = spidev.SpiDev()
+    bus = 1
+    device = 0
+    spi.open(bus,  device)
+    spi.mode = 0
+    spi.max_speed_hz = 7500000
+    spi.bits_per_word = 8
+    spi.threewire = False
+    spi.cshigh = False
+    spi.lsbfirst = False
+    spi.xfer2([(0x7F|0x80), 0x00]) #"switch to spi"
+    
     dataToSend = [[0.0,0.0,0.0, 0.0, 0], [0.0,0.0,0.0, 0.0, 0], [0.0,0.0,0.0, 0.0, 0], [0.0, 0]] # gyr, acc, mag, [x,y,z,dTime,isNewData], [alt über null,isNewData]
+    
+    
+    def ReadReg(self, reg):
+        returnmsg = self.spi.xfer2([(reg|0x80), 0x00])
+        return returnmsg[1]
 
+    def ReadRegs(self, reg, n):
+        sendmsg = [(reg|0x80)]
+        for i in range(n):
+            sendmsg.add(0x00)
+        returnmsg = self.spi.xfer2(sendmsg)
+        return returnmsg[1:]
+
+    def WriteReg(self, reg, data):
+        sendmsg = [(reg&0xF7), data]
+        self.spi.wirtebytes(sendmsg)
+    
     def Kallib(self):
         print ("kalib gestartet")
         time.sleep(1)
@@ -174,23 +248,33 @@ class BMI160():
 
     def InitRead(self):
         print ("BMI160 read init")
-        self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.CMD,self.ACC_SET_PMU_MODE)
+        #self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.CMD,self.ACC_SET_PMU_MODE)
+        self.WriteReg(self.CMD,self.ACC_SET_PMU_MODE)
         time.sleep(0.01)
-        self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.CMD,self.GYR_SET_PMU_MODE)
+        #self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.CMD,self.GYR_SET_PMU_MODE)
+        self.WriteReg(self.CMD,self.GYR_SET_PMU_MODE)
         time.sleep(0.1)
-        err = self.bus.read_byte_data(self.BMI160_I2C_ADDR,0x02)
+        err =  self.ReadReg(0x02)#self.bus.read_byte_data(self.BMI160_I2C_ADDR,0x02)
         if (err != 0):
             print("INIT0 Error in Err-Reg [", bin(err), "]")
-        self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.CMD,self.MAG_SET_PMU_MODE)
+        #self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.CMD,self.MAG_SET_PMU_MODE)
+        self.WriteReg(self.CMD,self.MAG_SET_PMU_MODE)
         time.sleep(0.01)
-        err = self.bus.read_byte_data(self.BMI160_I2C_ADDR,0x02)
+        err =  self.ReadReg(0x02) #self.bus.read_byte_data(self.BMI160_I2C_ADDR,0x02)
         if (err != 0):
             print ("INIT1 Error in Err-Reg [", bin(err), "]")
-        self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.FOC_CONF,self.FOC_CONF_DATA)
-        self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.ACC_CONF,self.CONF_DATA)
-        self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.ACC_RANGE,self.ACC_RANGE_DATA)
-        self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.GYR_CONF,self.CONF_DATA)
-        self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.GYR_RANGE,self.GYR_RANGE_DATA)
+        #self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.INT_LATCH,self.INT_LATCH_DATA)
+        self.WriteReg(self.INT_LATCH,self.INT_LATCH_DATA)
+        #self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.FOC_CONF,self.FOC_CONF_DATA)
+        self.WriteReg(self.FOC_CONF,self.FOC_CONF_DATA)
+        #self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.ACC_CONF,self.CONF_DATA)
+        self.WriteReg(self.ACC_CONF,self.CONF_DATA)
+        #self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.ACC_RANGE,self.ACC_RANGE_DATA)
+        self.WriteReg(self.ACC_RANGE,self.ACC_RANGE_DATA)
+        #self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.GYR_CONF,self.CONF_DATA)
+        self.WriteReg(self.GYR_CONF,self.CONF_DATA)
+        #self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.GYR_RANGE,self.GYR_RANGE_DATA)
+        self.WriteReg(self.GYR_RANGE,self.GYR_RANGE_DATA)
         #set up bmm150
         self.bus.write_byte_data(self.BMM150_I2C_ADDR,self.MAG_POWER,  self.MAG_POWER_DATA)
         time.sleep(0.1)
@@ -201,40 +285,43 @@ class BMI160():
         self.bus.write_byte_data(self.BMM150_I2C_ADDR,self.BMM150_REP_Z_ADDR,  self.BMM150_REGULAR_REPZ)
         self.read_trim_registers()
 
-        self.bus.write_byte_data(self.BMI160_I2C_ADDR,0x77,0b11000000) #Enable Offset
-        self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.CMD,self.FOC) #unabhngig von Range_Data
+        #self.bus.write_byte_data(self.BMI160_I2C_ADDR,0x77,0b11000000) #Enable Offset
+        self.WriteReg(0x77,0b11000000)
+        #self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.CMD,self.FOC) #unabhngig von Range_Data
+        self.WriteReg(self.CMD,self.FOC) 
         time.sleep(0.25)
 
-        sensortime = self.bus.read_i2c_block_data(self.BMI160_I2C_ADDR,0x18,3)
+        sensortime = self.ReadRegs(0x18,3)#self.bus.read_i2c_block_data(self.BMI160_I2C_ADDR,0x18,3)
         sensortime = sensortime[0] + (sensortime[1]<<8) + (sensortime[2]<<16)
         self.sensortimeOldAcc = sensortime
         self.sensortimeOldGyr = sensortime
 
     def ReadOnce(self):
         try:
-            id = self.bus.read_byte_data(self.BMI160_I2C_ADDR, 0x00)
+            id = self.ReadReg(0x00) #self.bus.read_byte_data(self.BMI160_I2C_ADDR, 0x00)
             #print "Device ID [", hex(id), "]"
             if (id != self.BMI_PARTID):
                 print ("Wrong Device ID [", hex(id), "]")
                 return
-            err = self.bus.read_byte_data(self.BMI160_I2C_ADDR,0x02)
+
+            err = self.ReadReg(0x02) #self.bus.read_byte_data(self.BMI160_I2C_ADDR,0x02)
             if (err != 0):
                 print ("Error in Err-Reg Read Once[", bin(err), "]")
-                #self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.CMD,0xB6)
-                #self.InitRead()
+                #old?#self.bus.write_byte_data(self.BMI160_I2C_ADDR,self.CMD,0xB6)
+                #old?#self.InitRead()
                 return
-            #print "err: ", bin(err)
-            sensortimel = self.bus.read_i2c_block_data(self.BMI160_I2C_ADDR,0x18,3)
+            sensortimel = self.ReadRegs(0x18,3) #self.bus.read_i2c_block_data(self.BMI160_I2C_ADDR,0x18,3)
+
             self.sensortime = sensortimel[0] + (sensortimel[1]<<8) + (sensortimel[2]<<16)
-            #print "sensortime: ",sensortime
-            #pmu_status = self.bus.read_byte_data(self.BMI160_I2C_ADDR,0x03)
-            #print ("pmu_status: ", bin(pmu_status))
-            status = self.bus.read_byte_data(self.BMI160_I2C_ADDR,0x1B)
+            #old#print "sensortime: ",sensortime
+            #old#pmu_status = self.bus.read_byte_data(self.BMI160_I2C_ADDR,0x03)
+            #old#print ("pmu_status: ", bin(pmu_status))
+            status = self.ReadReg(0x1B) #self.bus.read_byte_data(self.BMI160_I2C_ADDR,0x1B)
             #print ("status: ",(0b01000000 & status))
 
             if ((0b01000000 & status) > 0): #neue GYR daten auslesen und auf istwinkel integrieren
                 #print "new gyr data"
-                gyr_raw = self.bus.read_i2c_block_data(self.BMI160_I2C_ADDR,0x0C,6)
+                gyr_raw =  self.ReadRegs(0x0C,6) #self.bus.read_i2c_block_data(self.BMI160_I2C_ADDR,0x0C,6)
                 lgyr = [gyr_raw[0] + (gyr_raw[1]<<8), gyr_raw[2] + (gyr_raw[3]<<8), gyr_raw[4] + (gyr_raw[5]<<8)]
 
                 faktor = 1.0 / (self.ZWEI_BYTE_MAX / 2.0) * self.GYR_RANGE_DATA_IN_GRAD_SEC
@@ -266,7 +353,7 @@ class BMI160():
 
             if ((0b10000000 & status) > 0): # Acc auslesen
                 #print ("new acc data")
-                acc_raw = self.bus.read_i2c_block_data(self.BMI160_I2C_ADDR,0x12,6)
+                acc_raw = self.ReadRegs(0x12,6) #self.bus.read_i2c_block_data(self.BMI160_I2C_ADDR,0x12,6)
                 lacc = [acc_raw[0] + (acc_raw[1]<<8), acc_raw[2] + (acc_raw[3]<<8), acc_raw[4] + (acc_raw[5]<<8)]
                 faktor = 1.0 / (self.ZWEI_BYTE_MAX / 2.0) * self.ACC_RANGE_DATA_IN_M_S
                 if (lacc[0]> self.ZWEI_BYTE_MAX/2):
@@ -306,10 +393,13 @@ class BMI160():
             log.write(errmsg)
             log.close()
             if(KONST.ethconn):
-                raise
+                if (str(e) == "[Errno 6] No such device or address" or str(e) == "[Errno 110] Connection timed out"):
+                    print("passed")
+                    time.sleep(0.1)
+                    pass
+                else:
+                    raise
             else:
-                if (str(e) == "[Errno 6] No such device or address"):
-                    self.InitRead()
                 pass
 
     def ReadOnceMag(self):
@@ -319,7 +409,7 @@ class BMI160():
             if (id != self.BMM_PARTID):
                 print ("Wrong Device ID BMM150[", hex(id), "]")
                 return
-            sensortimel = self.bus.read_i2c_block_data(self.BMI160_I2C_ADDR,0x18,3)
+            sensortimel = self.ReadRegs(0x18,3) #self.bus.read_i2c_block_data(self.BMI160_I2C_ADDR,0x18,3)
             self.sensortime = sensortimel[0] + (sensortimel[1]<<8) + (sensortimel[2]<<16)
             #print "sensortime: ",sensortime
             #pmu_status = self.bus.read_byte_data(self.BMI160_I2C_ADDR,0x03)
@@ -352,13 +442,13 @@ class BMI160():
                 self.mag[0] = - self.Compensate_z(lmag[2], rhall)# - self.magKallib[2]
                 if(1): #1für std; 0 für callib aufnahmen
                     self.mag_n = self.mag
-                    self.mag_n[0] = self.mag_n[0] -(-36.751599)
-                    self.mag_n[1] = self.mag_n[1] -(2.567309)
-                    self.mag_n[2] = self.mag_n[2] -(-16.930631)
+                    self.mag_n[0] = self.mag_n[0] -(-38.159349)
+                    self.mag_n[1] = self.mag_n[1] -(0.190103)
+                    self.mag_n[2] = self.mag_n[2] -(-7.287803)
                     
-                    self.mag[0] = self.mag_n[0] * (0.025025) + self.mag_n[1] * (-0.000275) + self.mag_n[2] * (-0.000179)
-                    self.mag[1] = self.mag_n[0] * (-0.000275) + self.mag_n[1] * (0.026307) + self.mag_n[2] * (0.000610)
-                    self.mag[2] = self.mag_n[0] * (-0.000179) + self.mag_n[1] * (0.000610) + self.mag_n[2] * (0.028161)
+                    self.mag[0] = self.mag_n[0] * (0.020015) + self.mag_n[1] * (-0.000413) + self.mag_n[2] * (-0.000120)
+                    self.mag[1] = self.mag_n[0] * (-0.000413) + self.mag_n[1] * (0.020750) + self.mag_n[2] * (0.000226)
+                    self.mag[2] = self.mag_n[0] * (-0.000120) + self.mag_n[1] * (0.000226) + self.mag_n[2] * (0.022003)
                 else:
                     log = open("/home/odroid/Desktop/ericWorkspace/Python/LOG/LogMagForCallib","a") #log Für magneto tool
                     logstr = str(self.mag[0]) + "\t" + str(self.mag[1]) + "\t" + str(self.mag[2]) +"\n"
@@ -375,14 +465,17 @@ class BMI160():
             exit()
         except Exception as e:
             log = open(KONST.Filename,"a")
-            errmsg = "Unexpectet Error in BMI160:" + '\n' + str(e) + '\n'
+            errmsg = "Unexpectet Error in BMI160 read Mag:" + '\n' + str(e) + '\n'
             log.write(errmsg)
             log.close()
             if(KONST.ethconn):
-                raise
+                if (str(e) == "[Errno 6] No such device or address" or str(e) == "[Errno 110] Connection timed out"):
+                    print("passed")
+                    time.sleep(0.1)
+                    pass
+                else:
+                    raise
             else:
-                if (str(e) == "[Errno 6] No such device or address"):
-                    self.InitRead()
                 pass
 
     def Compensate_x(self, mag_data_x, data_rhall):
@@ -541,15 +634,30 @@ class BMI160():
         return 44330.0 * (1.0 - pow(atmospheric/seaLevel, 0.1903))
     
     def ReadOnceBME280(self):
-        tmon = round(time.monotonic(), 2) #alle 0,01 s
+        tmon = round(time.monotonic(), 1) #alle 0,1 s
         if(tmon-self.tmonCFoldBME != 0.0): 
             self.tmonCFoldBME = tmon
-            #self.temperatur = self.bme280.read_temperature()
-            self.druck = self.bme280.read_pressure()
-            self.barhoehe = self. get_altitude(self.druck, 1024.25)
-            self.dataToSend[3][0] = self.barhoehe
-            self.dataToSend[3][1] = 1
-            #print("self.barhoehe", self.barhoehe)
+            try:
+                #self.temperatur = self.bme280.read_temperature()
+                self.druck = self.bme280.read_pressure()
+                self.barhoehe = self. get_altitude(self.druck, 1024.25)
+                self.dataToSend[3][0] = self.barhoehe
+                self.dataToSend[3][1] = 1
+                #print("self.barhoehe", self.barhoehe)
+            except Exception as e:
+                log = open(KONST.Filename,"a")
+                errmsg = "Unexpectet Error in BMI160 Read BME280:" + '\n' + str(e) + '\n'
+                log.write(errmsg)
+                log.close()
+                if(KONST.ethconn):
+                    if (str(e) == "[Errno 6] No such device or address" or str(e) == "[Errno 110] Connection timed out"):
+                        print("passed")
+                        time.sleep(0.1)
+                        pass
+                    else:
+                        raise
+                else:
+                    pass
 
 def Process(qchild_bmi, qparent_bmi):
     print ("in Prozess BMI")
@@ -579,11 +687,23 @@ def Process(qchild_bmi, qparent_bmi):
     print("bmi160.magKallib", bmi160.magKallib)
     try:
         print ("BMI einsatzbereit")
-        #timeold = 0.0
-        while(True): # dauer pro schleife < 0,0034 s
-            #print(time.monotonic()-timeold)
-            #timeold = time.monotonic()
-            #print("asdfnkjasdjkndkjf")
+        #init für kopf
+        SCHRITTWEITE = 0.0050
+        tol = SCHRITTWEITE*1.1
+        newRun = time.monotonic()+SCHRITTWEITE
+        #init end kopf
+        while (True):
+            #kopf für while Timing
+            timetest = newRun - time.monotonic()
+            if(timetest>0 and timetest < tol):
+                time.sleep(timetest)
+            else:
+                #print("Sensorfusion timetest<0 oder > Schrerittweite +0.001")
+                #print(timetest)
+                newRun =  time.monotonic()+SCHRITTWEITE
+            #print("dauer für den letzten zeitschritt")
+            newRun = newRun+SCHRITTWEITE#Hz Timing
+            #ende kopf
             bmi160.ReadOnce()
             bmi160.ReadOnceMag()
             bmi160.ReadOnceBME280()
@@ -600,3 +720,28 @@ def Process(qchild_bmi, qparent_bmi):
     except:
         print ("Unexpected Error BMI")
         raise
+
+if __name__ == '__main__':
+    print ("in Prozess BMI")
+    bmi160 = BMI160()
+    bmi160.InitRead()
+    while(bmi160.gyr[2] == 0):
+        bmi160.ReadOnce()
+    time.sleep(0.5)
+    bmi160.Kallib()
+    kallibtxt = open(KONST.MAGKALLIBFILENAME,"r")
+    bmi160.magKallib[0] = float(kallibtxt.readline())
+    bmi160.magKallib[1] = float(kallibtxt.readline())
+    bmi160.magKallib[2] = float(kallibtxt.readline())
+    kallibtxt.close()
+    timeold = time.monotonic()
+    while(True): # dauer pro schleife < 0,0034 s
+        print(time.monotonic()-timeold)
+        timeold = time.monotonic()
+        os.system('clear')
+        print("asdfnkjasdjkndkjf")
+        bmi160.ReadOnce()
+        bmi160.ReadOnceMag()
+        bmi160.ReadOnceBME280()
+        print("bmi data to send", bmi160.dataToSend)
+    

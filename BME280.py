@@ -70,6 +70,7 @@ class BME280:
     param = {}
 
     def __init__(self, bus_n):
+        return
         self.bus = bus_n
         self.chip_id = self.read(regs['BME280_CHIP_ID_REG'], 1)[0]
         if self.chip_id != BME280_CHIP_ID:
@@ -238,6 +239,7 @@ class BME280:
         return h
 
     def read_pressure(self):
+        return 0
         vals = self.read(regs['BME280_PRESSURE_MSB_REG'], 8)
         raw_val = float((vals[0] << 12) | (vals[1] << 4) | (vals[2] >> 4))
         """

@@ -190,7 +190,7 @@ class SENS():
             winkel = [self.istgyr[0] / 180 * math.pi, self.istgyr[1] / 180 * math.pi, self.istgyr[2] / 180 * math.pi]
             V = KONST.RMatrixWeltZuFahrzeug(self.vWorld, winkel)
             for i in range(0, 3):
-                self.vVehicle[i] = 0.95 * self.vVehicle[i] + 0.02 * V[i]
+                self.vVehicle[i] = 0.98 * self.vVehicle[i] + 0.02 * V[i]
     
 def Process(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps, qparent_sens_reg,  qchild_sens_reg):
     try:

@@ -8,7 +8,7 @@ import maestro
 class REGELUNG():
     pidRoll = PID.PID()
     kp = 3.5
-    ki = 0.5
+    ki = 0.05
     kd = 0.6
     pidRoll.setKp(kp)
     pidRoll.setKi(ki)
@@ -17,7 +17,7 @@ class REGELUNG():
 
     pidPitch = PID.PID()
     kpPitch = 9.0
-    kiPitch = 0.5
+    kiPitch = 0.05
     kdPitch = 1.0
     pidPitch.setKp(kpPitch)
     pidPitch.setKi(kiPitch)
@@ -26,7 +26,7 @@ class REGELUNG():
     
     pidYaw = PID.PID()
     kpYaw = 9.0
-    kiYaw = 0.5
+    kiYaw = 0.05
     kdYaw = 1.0
     pidYaw.setKp(kpYaw)
     pidYaw.setKi(kiYaw)
@@ -55,7 +55,7 @@ class REGELUNG():
     servo.setRange(5,1000+servoCh5off,2000+servoCh5off)
     zusatzservo = 0.0
     tmonErrOld = 0.0
-    print("servo gestartet")
+    #print("servo gestartet")
     
     
     def ShiftInRange(self,wert,unten,oben):
@@ -119,7 +119,7 @@ class REGELUNG():
     
     def ControllSpeed(self):
         steuerung = 0.0001 * self.istgyr[1] * self.istgyr[1] + 0.0208 * self.istgyr[1] + 0.25
-        if(KONST.ethconn == True):
+        if(0):#KONST.ethconn == True):
             steuerung = -1.0
         return steuerung
     
@@ -132,7 +132,7 @@ class REGELUNG():
         
         abweichung = self.ShiftInRange(abweichung,-180,180)
         abweichung = abweichung/180
-        #print "abweichung", abweichung
+        #print ("abweichung", abweichung)
         self.pidPitch.update(abweichung)
         #print("pidpitch", self.pidPitch.output)
         steuerung = self.MaxAbsWert(self.pidPitch.output,-1,1)
@@ -142,7 +142,8 @@ class REGELUNG():
         else:
             if(self.gyr[1] < (- KONST.MINWRONGANGLESPEED) and abs(abweichung)*180 > 8):
                 steuerung = -1
-        #print("pwm: ",pwm)
+        steuerung = -1 * steuerung #reverse auf der funke angelegt /  zieht nase nach oben mit 1
+        #print("steuerung: ",steuerung)
         if(sollPitch>1000):
             steuerung = sollPitch / 1000 - 5
             
@@ -237,6 +238,7 @@ def Process(qparent_reg,  qchild_reg, qparent_sens_reg,  qchild_sens_reg):
                     p = reg.ControllPitch(reg.trajektorie[1])
                     y = reg.ControllYaw(reg.trajektorie[2])
                     s = reg.ControllSpeed()
+                    s = -1
                     reg.channel[1] = r
                     reg.channel[5] = r
                     reg.channel[2] = p

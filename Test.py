@@ -1,24 +1,28 @@
 import FSiA10B
 import GPSDevice
 import BMI160
-#import sys
+import sys
 import time
-import os
+#import os
 import multiprocessing as mp
 import LED
+import GUI
 import KONST
 import h5py
 from pathlib import Path
 import Sensorfusion
-import Regelung
+if ("noREG" in str(sys.argv)):
+    print("REG nicht initialisiert")
+else:
+    import Regelung
 import Trajektorie
 import math
-from colorama import Fore, Style 
+#from colorama import Fore, Style 
 
 try:
     eth = open("/sys/class/net/eth0/operstate","r")
     streth = eth.read(2)
-    print (streth)
+    #print (streth)
     eth.close()
 except FileNotFoundError:
     print("not Found: /sys/class/net/eth0/operstate")
@@ -45,7 +49,7 @@ lastValidCours = 0.0
 lastValidSpeed = 0.0
 n_Wp = [0.0, 0.0, 0.0, 0.0, 0.0]
 
-print("start")
+#print("start")
 
 
 #fsia10b = FSiA10B.FSiA10B()
@@ -54,7 +58,7 @@ chSend = KONST.CHSENDDEF
 gps = GPSDevice.GPSDevice()
 sens = Sensorfusion.SENS()
 trajek = Trajektorie.TRAJEKTORIE()
-print("obj generiert")
+#print("obj generiert")
 
 maxAbsGyr = [0.0,0.0,0.0]
 maxAbsAcc = [0.0,0.0,0.0]
@@ -132,32 +136,56 @@ if __name__ == '__main__':
     mp.set_start_method('spawn') #nur einmal angeben!!
     q_gps = mp.Queue()
     p_gps = mp.Process(target=GPSDevice.Process,  args=(q_gps, ))
-    p_gps.start()
+    if ("noGPS" in str(sys.argv)):
+        print("GPS nicht gestartet")
+    else:
+        p_gps.start()
     print("GPS alive: ", p_gps.is_alive())
     qparent_fs,  qchild_fs = mp.Pipe()
     p_fs = mp.Process(target=FSiA10B.Process,  args=(qchild_fs,qparent_fs ))
-    p_fs.start()
+    if ("noFSiA10B" in str(sys.argv)):
+        print("FSiA10B nicht gestartet")
+    else:
+        p_fs.start()
     print("FSiA10B alive: ", p_fs.is_alive())
     qparent_bmi,  qchild_bmi = mp.Pipe()
     p_bmi = mp.Process(target=BMI160.Process,  args=(qchild_bmi, qparent_bmi))
-    p_bmi.start()
+    if ("noBMI" in str(sys.argv)):
+        print("BMI nicht gestartet")
+    else:
+        p_bmi.start()
     print("BMI160 alive: ", p_bmi.is_alive())
     qparent_led,  qchild_led = mp.Pipe()
     p_led = mp.Process(target=LED.Process,  args=(qchild_led, qparent_led))
-    p_led.start()
+    if ("noLED" in str(sys.argv)):
+        print("LED nicht gestartet")
+    else:
+        p_led.start()
     print("Led alive: ", p_led.is_alive())
     qparent_sens,  qchild_sens = mp.Pipe()
     qparent_sens_reg,  qchild_sens_reg = mp.Pipe()
     p_sens = mp.Process(target=Sensorfusion.Process,  args=(qparent_sens,  qchild_sens, qparent_bmi,  qchild_bmi, q_gps, qparent_sens_reg,  qchild_sens_reg))
-    p_sens.start()
+    if ("noSENS" in str(sys.argv)):
+        print("SENS nicht gestartet")
+    else:p_sens.start()
     print("Sensorfusion alive: ", p_sens.is_alive())
     qparent_reg,  qchild_reg = mp.Pipe()
-    p_reg = mp.Process(target=Regelung.Process,  args=(qparent_reg,  qchild_reg, qparent_sens_reg,  qchild_sens_reg))
-    p_reg.start()
-    print("Regelung alive: ", p_reg.is_alive())
+    if ("noREG" in str(sys.argv)):
+        print("REG nicht gestartet")
+    else:
+        p_reg = mp.Process(target=Regelung.Process,  args=(qparent_reg,  qchild_reg, qparent_sens_reg,  qchild_sens_reg))
+        p_reg.start()
+        print("Regelung alive: ", p_reg.is_alive())
+    qparent_gui,  qchild_gui = mp.Pipe()
+    p_gui = mp.Process(target=GUI.Process,  args=(qparent_gui, qchild_gui))
+    if ("noGUI" in str(sys.argv)):
+        print("GUI nicht gestartet")
+    else:
+        p_gui.start()
+    print("GUI alive: ", p_gui.is_alive())
     print("Prozesse gestartet")
     
-    print("Standby, trck beide Taster um fortzufahren")
+    print("Standby, tuerck beide Taster um fortzufahren")
     kallibstate = -1
     while(taster[0] != KONST.BT):
         if (qparent_bmi.poll() == True):
@@ -191,84 +219,42 @@ if __name__ == '__main__':
     for i in range (1, 7):
        dataForRegleung[1][i] = channel[i]
     qparent_reg.send(dataForRegleung)
-    #/////////////////////////MAG Kallib ///////////////////////////
-    print("MAG Kallib")
-#    tasterReleased = 0
-#    gpsUp = 0
-#    while(taster[0] != KONST.TL or tasterReleased == 0 or kallibstate != 0 ):#or gpsUp == 0):
-#        if (qparent_led.poll() == True):
-#            taster =  qparent_led.recv()
-#        if (taster[0] == KONST.KT):
-#            tasterReleased = 1
-#        if (qparent_sens.poll() == True):
-#            gpsUp = qparent_sens.recv()
-#        if (qchild_led.poll() == False):
-#            if(gpsUp == 0):
-#                qparent_led.send(KONST.magkallib)
-#            else:
-#                qparent_led.send(KONST.magkallibwpos)
-#        if(tasterReleased == 1 and taster[0] == KONST.TRL):#Start MAG Kallib und Vorne
-#            print("Start MAG KAllib => VORNE")
-#            qparent_bmi.send(1)
-#            qparent_led.send(KONST.kallib)
-#            time.sleep(1)
-#            while( qparent_bmi.poll() == False):
-#                time.sleep(0.01)
-#            qparent_led.send(KONST.magkallib2)
-#            kallibstate =  qparent_bmi.recv()
-#            print("MAG KAllib => RECHTS")
-#            while(taster[0] != KONST.KT):
-#                if (qparent_led.poll() == True):
-#                    taster =  qparent_led.recv()
-#            while(taster[0] != KONST.TR):#Rechts
-#                if (qparent_led.poll() == True):
-#                    taster =  qparent_led.recv()
-#            qparent_bmi.send(2)
-#            qparent_led.send(KONST.kallib)
-#            time.sleep(1)
-#            while( qparent_bmi.poll() == False):
-#                time.sleep(0.01)
-#            qparent_led.send(KONST.magkallib3)
-#            kallibstate =  qparent_bmi.recv()
-#            print("MAG KAllib => HINTEN")
-#            while(taster[0] != KONST.KT):
-#                if (qparent_led.poll() == True):
-#                    taster =  qparent_led.recv()
-#            while(taster[0] != KONST.TR): #Hinten
-#                if (qparent_led.poll() == True):
-#                    taster =  qparent_led.recv()
-#            qparent_bmi.send(3)
-#            qparent_led.send(KONST.kallib)
-#            time.sleep(1)
-#            while( qparent_bmi.poll() == False):
-#                time.sleep(0.01)
-#            qparent_led.send(KONST.magkallib4)
-#            kallibstate =  qparent_bmi.recv()
-#            print("MAG KAllib => LINKS")
-#            while(taster[0] != KONST.KT):
-#                if (qparent_led.poll() == True):
-#                    taster =  qparent_led.recv()
-#            while(taster[0] != KONST.TR): #Links
-#                if (qparent_led.poll() == True):
-#                    taster =  qparent_led.recv()
-#            qparent_bmi.send(4)
-#            qparent_led.send(KONST.kallib)
-#            time.sleep(1)
-#            while( qparent_bmi.poll() == False):
-#                time.sleep(0.01)
-#            qparent_led.send(KONST.magkallib)
-#            kallibstate =  qparent_bmi.recv()
-#            if(kallibstate != 4):
-#                print("ERROR ind der Kallib")
-#            else:
-#                kallibstate = 0
-#            print("MAG KAllib ENDE")
-    #////////ENDE KALLIBS ///////////////////////////////////////////////
+
+ #////////ENDE KALLIBS ///////////////////////////////////////////////
     qparent_bmi.send(0)
     qparent_bmi.send(0)
     qparent_sens.send(0)
     qparent_led.send(KONST.manuell)
     #qparent_sens.send(1)
+    #/////////////////wait for gps or override///////////////////////
+    print("wait for gps oder ignorieren durch halten des linken tasters")
+    gpsUp = 0
+    while(taster[0] != KONST.TLL and gpsUp == 0):
+        if (qparent_led.poll() == True):
+            taster =  qparent_led.recv()
+        if (qparent_sens.poll() == True):
+            #print(qparent_sens.recv())
+            recvData =  qparent_sens.recv()
+            for i in range(0, 3):
+                #print("i", i)
+                #print("type(sens.gyr_raw[i])", type(sens.gyr_raw[i]))
+                #print("type(recvData[0][i])", type(recvData[0][i]))
+                sens.gyr_raw[i]  = recvData[0][i] #[gyr,acc,mag,accOhneG,istgyr,vVehicle,vWorld,pos,gps ]
+                sens.acc_raw[i]  = recvData[1][i]
+                sens.mag_raw[i]  = recvData[2][i]
+                sens.accOhneG[i]  = recvData[3][i]
+                sens.istgyr[i]  = recvData[4][i]
+                sens.vVehicle[i]  = recvData[5][i]
+                sens.vWorld[i]  = recvData[6][i]
+                sens.pos[i]  = recvData[7][i]
+            sens.gps.lat = recvData[8][0]
+            sens.gps.lon  = recvData[8][1]
+            sens.yagyr = recvData[9][0]
+            if(isinstance(sens.gps.lat, float)):
+                gpsUp = 1
+                #print("gpsUp = 1")
+            
+    #/////////////////wait for gps or override///////////////////////
     try:
         print("while start")
         #init für kopf
@@ -291,19 +277,8 @@ if __name__ == '__main__':
                 #ende kopf
                 
                 #print("run")
-#                if (q_gps.empty() == False):
-#                    gps = q_gps.get()
-#                    if(isinstance(gps.lat, float)):
-#                        lastValidLat = gps.lat
-#                        lastValidLon = gps.lon
-#                    if(isinstance(gps.cours, float)):
-#                        lastValidCours = gps.cours
-#                    if(isinstance(gps.speed, float)):
-#                        lastValidSpeed = gps.speed
                 if (qparent_fs.poll() == True):
                    channel =  qparent_fs.recv()
-#                if (qparent_bmi.poll() == True):
-#                   bmi160 =  qparent_bmi.recv()
                 if (qparent_reg.poll() == True):
                     chSend =  qparent_reg.recv()
                 if (qparent_led.poll() == True):
@@ -366,33 +341,6 @@ if __name__ == '__main__':
                         n_Wp[2] = sens.pos[2]
                         n_Wp[4] = 1
                         trajek.SetNewWaypoint(n_Wp)
-#                    if (channel[8] == 1 and VRBOld != channel[6]):
-#                        delta = VRBOld - channel[6]
-#                        VRBOld = channel[6]
-#                        kp = kp + delta * 3.0
-#                        if (kp < 0):
-#                            kp = 0.0
-#                        pidRoll.setKp(kp)
-#                        logstr = logstr + "Neuer Kp: "+str(kp)+'\n'
-#                    if (channel[9] == 1 and VRBOld != channel[6]):
-#                        delta = VRBOld - channel[6]
-#                        VRBOld = channel[6]
-#                        ki = ki + delta * 3.0
-#                        if (ki < 0):
-#                            ki = 0.0
-#                        pidRoll.setKp(ki)
-#                        logstr = logstr + "Neuer Ki: "+str(ki)+'\n'
-#                    if (channel[7]== 1 and VRBOld != channel[6]):
-#                        delta = VRBOld - channel[6]
-#                        VRBOld = channel[6]
-#                        kd = kd + delta * 3.0
-#                        if (kd < 0):
-#                            kd = 0.0
-#                        pidRoll.setKp(ki)
-#                        logstr = logstr + "Neuer Kd"+str(kd)+'\n'
-#                    if (channel[7] == -1 and channel[8] == -1 and channel[9] == -1):
-#                        VRBOld = channel[6]
-                    
                     dataForRegleung[2] = trajek.StupidControl(sens.pos, sens.istgyr, dposStupidControll)
                     
                     if(qchild_reg.poll() == False):
@@ -469,7 +417,10 @@ if __name__ == '__main__':
                             dsetH5cuw[countH5cuw, 18+i] = sens.accogWorld[i]
                             dsetH5cuw[countH5cuw, 21+i] = sens.vVehicle[i]
                             dsetH5cuw[countH5cuw, 24+i] = sens.vWorld[i]
-                            dsetH5cuw[countH5cuw, 27+i] = sens.pos[i]
+                            if(countH5cuw>1):
+                                dsetH5cuw[countH5cuw, 27+i] = sens.pos[i]-dsetH5cuw[1, 27+i]
+                            else:
+                                dsetH5cuw[countH5cuw, 27+i] = sens.pos[i]
                         if(isinstance(sens.gps.lat, float)):
                             dsetH5cuw[countH5cuw, 30] = sens.gps.lat
                             dsetH5cuw[countH5cuw, 31] = sens.gps.lon
@@ -482,36 +433,13 @@ if __name__ == '__main__':
                     #"gui"
                     akkuSpannung = (taster[1] - 1575) / 165 * 100
                     akkuSpannung = round(akkuSpannung, 2)
-                    if(1): # zeige gui wenn 1
-                        os.system('clear')
-                        print(oldLogstr)
-                        if(channel[0] == 29.832):
-                            print(Fore.GREEN + "FSiA10B status:", channel[0], " Modus: ",  channel[10])
-                        else: 
-                            print(Fore.RED + "FSiA10B status:", channel[0], " Modus: ",  channel[10])
-                        if(isinstance(sens.gps.lat, float)):
-                            print(Fore.GREEN + "GPS up")
-                        else: 
-                            print(Fore.RED + "GPS down")
-                        print(Style.RESET_ALL+"Roll, Pitch, Yaw: ", round(sens.istgyr[0], 2), round(sens.istgyr[1], 2), round(sens.istgyr[2], 2)) 
-                        if(akkuSpannung > 0):
-                            print(Fore.GREEN + "akkuSpannung %: ", akkuSpannung)
-                        else: 
-                            print(Fore.RED + "akkuSpannung %: ", akkuSpannung)
-                            if(akkuSpannung > -500):
-                                print("Akku nicht angeschlossen, akkuSpannung: ",  akkuSpannung)
-                        if(KONST.ethconn):
-                            print(Fore.GREEN + "KONST.ethconn: ",  KONST.ethconn)
-                        else: 
-                            print(Fore.RED + "KONST.ethconn: ",  KONST.ethconn)
-                        print(Style.RESET_ALL)
-                        print("sens.yagyr: ",  sens.yagyr)
-                        print("dposStupidControll", dposStupidControll[0], "  ",dposStupidControll[1], "  ", dposStupidControll[2] )
-                        print("dposStupidControll dpitch  dyaw", dposStupidControll[3], "  ",dposStupidControll[4])
-                        print("dataForRegleung[2]: ", dataForRegleung[2])
-                        #print("(n_Wp): ", (n_Wp))
+                    if(p_gui.is_alive()): # update gui wenn prozess noch lebendig
+                        guiDate = [akkuSpannung, [channel[0], channel[10], channel[1]], [sens.gps.lat, sens.gps.lon], [sens.pos[0], sens.pos[1], sens.pos[2]], [round(sens.vWorld[0], 2), round(sens.vWorld[1], 2), round(sens.vWorld[2], 2)], [round(sens.istgyr[0], 2), round(sens.istgyr[1], 2), round(sens.istgyr[2], 2)] , [round(sens.gyr_raw[0], 2), round(sens.gyr_raw[1], 2), round(sens.gyr_raw[2], 2)] , -1, KONST.ethconn, [0, 0, 0]]
+                        if(qchild_gui.poll() == False):
+                            qparent_gui.send(guiDate)
+                        
                     if(akkuSpannung <= 0.0):
-                        if(akkuSpannung > -500):
+                        if(akkuSpannung > -300):
                             print("!!!!!!!!!!! akkuSpannung zu tief !!!!!!!!!!!!!: ",  akkuSpannung)
                             print("!!!!!!!!!!! akkuSpannung zu tief !!!!!!!!!!!!!: ",  akkuSpannung)
                             print("!!!!!!!!!!! akkuSpannung zu tief !!!!!!!!!!!!!: ",  akkuSpannung)
